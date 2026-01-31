@@ -179,4 +179,78 @@ describe("credentials", () => {
       expect(loadCredentials(testFile)).toEqual({ test: "data" });
     });
   });
+
+  describe("security edge cases", () => {
+    it("fails decryption with tampered ciphertext", () => {
+      saveCredentials(testFile, { secret: "data" });
+
+      // Tamper with the encrypted data
+      const raw = JSON.parse(fs.readFileSync(testFile, "utf8"));
+      raw.data = "dGFtcGVyZWQ="; // "tampered" in base64
+      fs.writeFileSync(testFile, JSON.stringify(raw));
+
+      expect(() => loadCredentials(testFile)).toThrow();
+    });
+
+    it("fails decryption with tampered auth tag", () => {
+      saveCredentials(testFile, { secret: "data" });
+
+      const raw = JSON.parse(fs.readFileSync(testFile, "utf8"));
+      // Corrupt the auth tag
+      raw.authTag = "AAAAAAAAAAAAAAAAAAAAAA==";
+      fs.writeFileSync(testFile, JSON.stringify(raw));
+
+      expect(() => loadCredentials(testFile)).toThrow();
+    });
+
+    it("fails decryption with wrong key", () => {
+      saveCredentials(testFile, { secret: "data" });
+
+      // Change to a different key
+      process.env.OPENCLAW_ENCRYPTION_KEY = "c".repeat(64);
+      _resetKeyCache();
+
+      expect(() => loadCredentials(testFile)).toThrow();
+    });
+
+    it("returns undefined for empty file", () => {
+      fs.writeFileSync(testFile, "");
+      expect(loadCredentials(testFile)).toBeUndefined();
+    });
+
+    it("returns undefined for whitespace-only file", () => {
+      fs.writeFileSync(testFile, "   \n\t  ");
+      expect(loadCredentials(testFile)).toBeUndefined();
+    });
+
+    it("returns undefined for invalid JSON", () => {
+      fs.writeFileSync(testFile, "{ invalid json }");
+      expect(loadCredentials(testFile)).toBeUndefined();
+    });
+
+    it("handles truncated IV gracefully", () => {
+      saveCredentials(testFile, { secret: "data" });
+
+      const raw = JSON.parse(fs.readFileSync(testFile, "utf8"));
+      raw.iv = "AA=="; // Too short
+      fs.writeFileSync(testFile, JSON.stringify(raw));
+
+      expect(() => loadCredentials(testFile)).toThrow();
+    });
+
+    it("isEncrypted returns false for empty file", () => {
+      fs.writeFileSync(testFile, "");
+      expect(isEncrypted(testFile)).toBe(false);
+    });
+
+    it("migrateCredentials returns false for empty file", () => {
+      fs.writeFileSync(testFile, "");
+      expect(migrateCredentials(testFile)).toBe(false);
+    });
+
+    it("migrateCredentials returns false for invalid JSON", () => {
+      fs.writeFileSync(testFile, "not json");
+      expect(migrateCredentials(testFile)).toBe(false);
+    });
+  });
 });

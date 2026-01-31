@@ -36,8 +36,33 @@ interface LegacyEncryptedData {
 
 let cachedKey: Buffer | null = null;
 
+// PBKDF2 iterations: OWASP recommends 600,000+ for SHA-256 (as of 2023)
+const PBKDF2_ITERATIONS = 600000;
+
 function getKeyPath(): string {
   return path.join(process.env.HOME || ".", ".openclaw", "encryption.key");
+}
+
+function getSaltPath(): string {
+  return path.join(process.env.HOME || ".", ".openclaw", "encryption.salt");
+}
+
+function getOrCreateSalt(): Buffer {
+  const saltPath = getSaltPath();
+  if (fs.existsSync(saltPath)) {
+    const stats = fs.lstatSync(saltPath);
+    if (stats.isSymbolicLink()) {
+      throw new Error("Salt file cannot be a symbolic link");
+    }
+    return Buffer.from(fs.readFileSync(saltPath, "utf8").trim(), "hex");
+  }
+
+  // Generate random salt
+  const salt = crypto.randomBytes(32);
+  const dir = path.dirname(saltPath);
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  fs.writeFileSync(saltPath, salt.toString("hex"), { mode: 0o600 });
+  return salt;
 }
 
 function getKey(): Buffer {
@@ -46,23 +71,45 @@ function getKey(): Buffer {
   // Option 1: Environment variable
   const envKey = process.env.OPENCLAW_ENCRYPTION_KEY;
   if (envKey) {
-    cachedKey = /^[0-9a-f]{64}$/i.test(envKey)
-      ? Buffer.from(envKey, "hex")
-      : crypto.pbkdf2Sync(envKey, "openclaw-salt", 100000, 32, "sha256");
+    if (/^[0-9a-f]{64}$/i.test(envKey)) {
+      // Direct hex key - no derivation needed
+      cachedKey = Buffer.from(envKey, "hex");
+    } else {
+      // Password - derive with random salt
+      const salt = getOrCreateSalt();
+      cachedKey = crypto.pbkdf2Sync(envKey, salt, PBKDF2_ITERATIONS, 32, "sha256");
+    }
     return cachedKey;
   }
 
   // Option 2: Key file (auto-generate if missing)
   const keyPath = getKeyPath();
   if (fs.existsSync(keyPath)) {
+    // Check for symlink attack
+    const stats = fs.lstatSync(keyPath);
+    if (stats.isSymbolicLink()) {
+      throw new Error("Key file cannot be a symbolic link");
+    }
     cachedKey = Buffer.from(fs.readFileSync(keyPath, "utf8").trim(), "hex");
     return cachedKey;
   }
 
-  // Generate new key
+  // Generate new key with exclusive file creation to prevent race conditions
   cachedKey = crypto.randomBytes(32);
-  fs.mkdirSync(path.dirname(keyPath), { recursive: true, mode: 0o700 });
-  fs.writeFileSync(keyPath, cachedKey.toString("hex"), { mode: 0o600 });
+  const dir = path.dirname(keyPath);
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+
+  // Use O_EXCL to fail if file already exists (race condition protection)
+  const fd = fs.openSync(
+    keyPath,
+    fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL,
+    0o600,
+  );
+  try {
+    fs.writeSync(fd, cachedKey.toString("hex"));
+  } finally {
+    fs.closeSync(fd);
+  }
   return cachedKey;
 }
 
@@ -140,11 +187,21 @@ function normalizeBlob(blob: EncryptedData | LegacyEncryptedData): EncryptedData
 
 /**
  * Load a JSON file, decrypting if encrypted.
+ * Returns undefined for missing files or empty/invalid JSON.
  */
 export function loadCredentials<T = unknown>(filepath: string): T | undefined {
   if (!fs.existsSync(filepath)) return undefined;
 
-  const raw = JSON.parse(fs.readFileSync(filepath, "utf8"));
+  const content = fs.readFileSync(filepath, "utf8").trim();
+  if (!content) return undefined; // Empty file
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(content);
+  } catch {
+    // Invalid JSON - return undefined rather than crashing
+    return undefined;
+  }
 
   if (isEncryptedBlob(raw)) {
     return decrypt(raw) as T;
@@ -167,12 +224,21 @@ export function saveCredentials(filepath: string, data: unknown): void {
 
 /**
  * Migrate a plaintext file to encrypted (no-op if already encrypted).
- * Returns true if migration occurred.
+ * Returns true if migration occurred, false if already encrypted or invalid.
  */
 export function migrateCredentials(filepath: string): boolean {
   if (!fs.existsSync(filepath)) return false;
 
-  const raw = JSON.parse(fs.readFileSync(filepath, "utf8"));
+  const content = fs.readFileSync(filepath, "utf8").trim();
+  if (!content) return false; // Empty file
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(content);
+  } catch {
+    return false; // Invalid JSON
+  }
+
   if (isEncryptedBlob(raw)) return false; // Already encrypted
 
   // Backup, then encrypt
@@ -187,7 +253,9 @@ export function migrateCredentials(filepath: string): boolean {
 export function isEncrypted(filepath: string): boolean {
   if (!fs.existsSync(filepath)) return false;
   try {
-    const raw = JSON.parse(fs.readFileSync(filepath, "utf8"));
+    const content = fs.readFileSync(filepath, "utf8").trim();
+    if (!content) return false;
+    const raw = JSON.parse(content);
     return isEncryptedBlob(raw);
   } catch {
     return false;

@@ -44,8 +44,10 @@ If no environment variable is set, a key is created automatically at `~/.opencla
 
 - **AES-256-GCM** with random IV per file
 - **Authentication tags** for integrity verification
-- **PBKDF2 derivation** if key is not hex
+- **PBKDF2 derivation** (600,000 iterations with random salt) if key is not hex
 - **Secure file permissions** (0600)
+- **Symlink attack protection** on key files
+- **Race condition protection** on key generation
 
 ## Migration
 
