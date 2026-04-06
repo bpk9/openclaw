@@ -11,11 +11,9 @@ import {
   resolveMainSessionAlias,
   stripToolMessages,
 } from "../../../agents/tools/sessions-helpers.js";
-import type {
-  SessionEntry,
-  loadSessionStore as loadSessionStoreFn,
-  resolveStorePath as resolveStorePathFn,
-} from "../../../config/sessions.js";
+import type { resolveStorePath as resolveStorePathFn } from "../../../config/sessions/paths.js";
+import type { loadSessionStore as loadSessionStoreFn } from "../../../config/sessions/store-load.js";
+import type { SessionEntry } from "../../../config/sessions/types.js";
 import { callGateway } from "../../../gateway/call.js";
 import { formatTimeAgo } from "../../../infra/format-time/format-relative.ts";
 import { parseAgentSessionKey } from "../../../routing/session-key.js";
@@ -38,6 +36,7 @@ import {
 
 export { extractAssistantText, stripToolMessages };
 export { resolveCommandSurfaceChannel, resolveChannelAccountId };
+export type { ChatMessage };
 
 export const COMMAND = "/subagents";
 export const COMMAND_KILL = "/kill";
