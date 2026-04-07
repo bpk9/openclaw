@@ -802,7 +802,11 @@ export const registerTelegramHandlers = ({
         return;
       }
       if (user?.is_bot) {
-        return;
+        const allowBotReactionForTesting =
+          process.env.OPENCLAW_TELEGRAM_ALLOW_BOT_REACTION_TEST === "1";
+        if (!allowBotReactionForTesting) {
+          return;
+        }
       }
       if (reactionMode === "own" && !telegramDeps.wasSentByBot(chatId, messageId)) {
         logVerbose(
