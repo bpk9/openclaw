@@ -856,6 +856,15 @@ export const registerTelegramHandlers = ({
         .filter((r): r is ReactionTypeEmoji => r.type === "emoji")
         .filter((r) => !oldEmojis.has(r.emoji));
 
+      const reactionTestMode = process.env.OPENCLAW_TELEGRAM_ALLOW_BOT_REACTION_TEST === "1";
+      if (reactionTestMode) {
+        runtime.info?.(
+          `telegram reaction event received chat=${chatId} msg=${messageId} userBot=${Boolean(user?.is_bot)} added=${addedReactions
+            .map((r) => r.emoji)
+            .join(",")}`,
+        );
+      }
+
       if (addedReactions.length === 0) {
         return;
       }
@@ -916,6 +925,9 @@ export const registerTelegramHandlers = ({
           coalesceMs: 500,
         });
         logVerbose(`telegram: reaction trigger woke agent for session ${sessionKey}`);
+        if (reactionTestMode) {
+          runtime.info?.(`telegram reaction trigger woke agent for session ${sessionKey}`);
+        }
       }
     } catch (err) {
       runtime.error?.(danger(`telegram reaction handler failed: ${String(err)}`));
