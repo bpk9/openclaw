@@ -24,6 +24,8 @@ const POLL_STOP_GRACE_MS = 15_000;
 
 const isTelegramReactionPollDiagEnabled =
   process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_POLL === "1";
+const isTelegramRunnerDispatchDiagEnabled =
+  process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_DISPATCH === "1";
 
 const waitForGracefulStop = async (stop: () => Promise<void>) => {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -314,6 +316,32 @@ export class TelegramPollingSession {
         inFlightGetUpdates = Math.max(0, inFlightGetUpdates - 1);
       }
     });
+
+    const originalHandleUpdate = bot.handleUpdate.bind(bot);
+    bot.handleUpdate = (async (...args: Parameters<typeof originalHandleUpdate>) => {
+      const update = args[0];
+      if (update && typeof update === "object") {
+        const typedUpdate = update as Record<string, unknown>;
+        const hasReaction = Object.prototype.hasOwnProperty.call(typedUpdate, "message_reaction");
+        const hasReactionCount = Object.prototype.hasOwnProperty.call(
+          typedUpdate,
+          "message_reaction_count",
+        );
+        if (isTelegramRunnerDispatchDiagEnabled || hasReaction || hasReactionCount) {
+          const updateId =
+            typeof typedUpdate.update_id === "number" ? String(typedUpdate.update_id) : "n/a";
+          const updateTypes = Object.entries(typedUpdate)
+            .filter(([key, value]) => key !== "update_id" && value !== undefined)
+            .map(([key]) => key)
+            .sort((a, b) => a.localeCompare(b))
+            .join(",");
+          this.opts.log(
+            `[telegram-runner-dispatch] account=${this.opts.accountId} update_id=${updateId} reaction=${hasReaction ? 1 : 0} reaction_count=${hasReactionCount ? 1 : 0} update_types=${updateTypes || "none"}`,
+          );
+        }
+      }
+      return await originalHandleUpdate(...args);
+    }) as typeof bot.handleUpdate;
 
     const runner = run(bot, this.opts.runnerOptions);
     this.#activeRunner = runner;
