@@ -140,6 +140,14 @@ export async function monitorTelegramProvider(opts: MonitorTelegramOpts = {}) {
       );
     }
 
+    const allowedUpdates = resolveTelegramAllowedUpdates();
+    const reactionAllowedUpdates = allowedUpdates.filter(
+      (updateType) => updateType === "message_reaction" || updateType === "message_reaction_count",
+    );
+    log(
+      `[telegram][diag] account=${account.accountId} transport=${opts.useWebhook ? "webhook" : "polling"} allowed_updates=${allowedUpdates.join(",")} reaction_updates=${reactionAllowedUpdates.join(",") || "none"}`,
+    );
+
     const proxyFetch =
       opts.proxyFetch ?? (account.config.proxy ? makeProxyFetch(account.config.proxy) : undefined);
 

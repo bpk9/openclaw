@@ -28,6 +28,9 @@ import { createTelegramBot } from "./bot.js";
 const TELEGRAM_WEBHOOK_MAX_BODY_BYTES = 1024 * 1024;
 const TELEGRAM_WEBHOOK_BODY_TIMEOUT_MS = 30_000;
 const TELEGRAM_WEBHOOK_CALLBACK_TIMEOUT_MS = 10_000;
+const isTelegramReactionWebhookDiagEnabled =
+  process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_WEBHOOK === "1" ||
+  process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_POLL === "1";
 const InputFileCtor: typeof grammy.InputFile =
   typeof grammy.InputFile === "function"
     ? grammy.InputFile
@@ -231,6 +234,27 @@ function resolveTelegramWebhookRateLimitKey(
   return `${path}:${resolveTelegramWebhookClientIp(req, config)}`;
 }
 
+function logTelegramWebhookIngress(params: {
+  runtime: RuntimeEnv;
+  accountId?: string;
+  update: unknown;
+}) {
+  if (!params.update || typeof params.update !== "object") {
+    return;
+  }
+  const update = params.update as Record<string, unknown>;
+  const hasReaction = Object.prototype.hasOwnProperty.call(update, "message_reaction");
+  const hasReactionCount = Object.prototype.hasOwnProperty.call(update, "message_reaction_count");
+  if (!isTelegramReactionWebhookDiagEnabled && !hasReaction && !hasReactionCount) {
+    return;
+  }
+  const updateIdRaw = update.update_id;
+  const updateId = typeof updateIdRaw === "number" ? String(updateIdRaw) : "n/a";
+  params.runtime.log?.(
+    `[telegram-webhook-ingress] account=${params.accountId ?? "default"} update_id=${updateId} reaction=${hasReaction ? 1 : 0} reaction_count=${hasReactionCount ? 1 : 0}`,
+  );
+}
+
 export async function startTelegramWebhook(opts: {
   token: string;
   accountId?: string;
@@ -370,6 +394,12 @@ export async function startTelegramWebhook(opts: {
         replied = true;
         respondText(401, "unauthorized");
       };
+
+      logTelegramWebhookIngress({
+        runtime,
+        accountId: opts.accountId,
+        update: body.value,
+      });
 
       await handler(body.value, reply, secretHeader, unauthorized);
       if (!replied) {
