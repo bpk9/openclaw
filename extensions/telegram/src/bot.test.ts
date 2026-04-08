@@ -2514,6 +2514,28 @@ describe("createTelegramBot", () => {
       `Telegram reaction added: ${FIRE_EMOJI} by Ada on msg 42`,
       `Telegram reaction added: ${PARTY_EMOJI} by Ada on msg 42`,
     ]);
+    expect(enqueueSystemEventSpy).toHaveBeenNthCalledWith(
+      1,
+      `Telegram reaction added: ${FIRE_EMOJI} by Ada on msg 42`,
+      expect.objectContaining({
+        deliveryContext: {
+          channel: "telegram",
+          to: "telegram:1234",
+          accountId: expect.any(String),
+        },
+      }),
+    );
+    expect(enqueueSystemEventSpy).toHaveBeenNthCalledWith(
+      2,
+      `Telegram reaction added: ${PARTY_EMOJI} by Ada on msg 42`,
+      expect.objectContaining({
+        deliveryContext: {
+          channel: "telegram",
+          to: "telegram:1234",
+          accountId: expect.any(String),
+        },
+      }),
+    );
   });
 
   it("routes forum group reactions to the general topic (thread id not available on reactions)", async () => {
