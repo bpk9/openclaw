@@ -376,27 +376,51 @@ export class TelegramPollingSession {
     const originalHandleUpdate = bot.handleUpdate.bind(bot);
     bot.handleUpdate = (async (...args: Parameters<typeof originalHandleUpdate>) => {
       const update = args[0];
+      let shouldLogDispatch = isTelegramRunnerDispatchDiagEnabled;
+      let updateId = "n/a";
+      let updateTypes = "none";
+      let hasReaction = false;
+      let hasReactionCount = false;
+
       if (update && typeof update === "object") {
         const typedUpdate = update as Record<string, unknown>;
-        const hasReaction = Object.prototype.hasOwnProperty.call(typedUpdate, "message_reaction");
-        const hasReactionCount = Object.prototype.hasOwnProperty.call(
-          typedUpdate,
-          "message_reaction_count",
-        );
-        if (isTelegramRunnerDispatchDiagEnabled || hasReaction || hasReactionCount) {
-          const updateId =
-            typeof typedUpdate.update_id === "number" ? String(typedUpdate.update_id) : "n/a";
-          const updateTypes = Object.entries(typedUpdate)
+        hasReaction = Object.prototype.hasOwnProperty.call(typedUpdate, "message_reaction");
+        hasReactionCount = Object.prototype.hasOwnProperty.call(typedUpdate, "message_reaction_count");
+        shouldLogDispatch = shouldLogDispatch || hasReaction || hasReactionCount;
+        updateId = typeof typedUpdate.update_id === "number" ? String(typedUpdate.update_id) : "n/a";
+        updateTypes =
+          Object.entries(typedUpdate)
             .filter(([key, value]) => key !== "update_id" && value !== undefined)
             .map(([key]) => key)
             .sort((a, b) => a.localeCompare(b))
-            .join(",");
+            .join(",") || "none";
+      }
+
+      const startedAtMs = shouldLogDispatch ? Date.now() : 0;
+      if (shouldLogDispatch) {
+        this.opts.log(
+          `[telegram-runner-dispatch] account=${this.opts.accountId} stage=enter update_id=${updateId} reaction=${hasReaction ? 1 : 0} reaction_count=${hasReactionCount ? 1 : 0} update_types=${updateTypes}`,
+        );
+      }
+
+      try {
+        const result = await originalHandleUpdate(...args);
+        if (shouldLogDispatch) {
+          const durationMs = Date.now() - startedAtMs;
           this.opts.log(
-            `[telegram-runner-dispatch] account=${this.opts.accountId} update_id=${updateId} reaction=${hasReaction ? 1 : 0} reaction_count=${hasReactionCount ? 1 : 0} update_types=${updateTypes || "none"}`,
+            `[telegram-runner-dispatch] account=${this.opts.accountId} stage=return update_id=${updateId} reaction=${hasReaction ? 1 : 0} reaction_count=${hasReactionCount ? 1 : 0} update_types=${updateTypes} duration_ms=${durationMs}`,
           );
         }
+        return result;
+      } catch (err) {
+        if (shouldLogDispatch) {
+          const durationMs = Date.now() - startedAtMs;
+          this.opts.log(
+            `[telegram-runner-dispatch] account=${this.opts.accountId} stage=throw update_id=${updateId} reaction=${hasReaction ? 1 : 0} reaction_count=${hasReactionCount ? 1 : 0} update_types=${updateTypes} duration_ms=${durationMs} err=${formatErrorMessage(err)}`,
+          );
+        }
+        throw err;
       }
-      return await originalHandleUpdate(...args);
     }) as typeof bot.handleUpdate;
 
     const runner = run(bot, this.opts.runnerOptions);
