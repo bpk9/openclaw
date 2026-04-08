@@ -826,10 +826,9 @@ export const registerTelegramHandlers = ({
       if (!reaction) {
         return;
       }
-      if (shouldSkipUpdate(ctx)) {
-        return;
-      }
 
+      const typedUpdate = (ctx.update ?? {}) as Record<string, unknown>;
+      const updateId = typeof typedUpdate.update_id === "number" ? String(typedUpdate.update_id) : "n/a";
       const chatId = reaction.chat.id;
       const messageId = reaction.message_id;
       const user = reaction.user;
@@ -837,11 +836,19 @@ export const registerTelegramHandlers = ({
       const senderUsername = user?.username ?? "";
       const isGroup = reaction.chat.type === "group" || reaction.chat.type === "supergroup";
       const isForum = reaction.chat.is_forum === true;
-      const reactionDiagPrefix = `[telegram-reaction-diag] account=${accountId} chat=${chatId} msg=${messageId} sender=${senderId || "anon"}`;
+      const reactionDiagPrefix = `[telegram-reaction-diag] account=${accountId} update_id=${updateId} chat=${chatId} msg=${messageId} sender=${senderId || "anon"}`;
+
+      const skippedByUpdateGate = shouldSkipUpdate(ctx);
+      reactionPipelineDiag?.(
+        `${reactionDiagPrefix} stage=pre-skip skipped=${skippedByUpdateGate} hasParsedReaction=${Boolean(ctx.messageReaction)} hasRawReaction=${Boolean(ctx.update?.message_reaction)}`,
+      );
+      if (skippedByUpdateGate) {
+        return;
+      }
 
       // Resolve reaction notification mode (default: "own").
       const reactionMode = telegramCfg.reactionNotifications ?? "own";
-      runtime.info?.(
+      reactionPipelineDiag?.(
         `${reactionDiagPrefix} stage=entry mode=${reactionMode} isGroup=${isGroup} isForum=${isForum}`,
       );
       if (reactionMode === "off") {
