@@ -979,6 +979,113 @@ export const registerTelegramHandlers = ({
       runtime.error?.(danger(`telegram reaction handler failed: ${String(err)}`));
     }
   });
+
+  // Fallback for chats where Telegram emits message_reaction_count updates
+  // without per-user message_reaction payloads.
+  bot.on("message_reaction_count", async (ctx) => {
+    try {
+      const reactionCount = ctx.messageReactionCount ?? ctx.update?.message_reaction_count;
+      if (!reactionCount) {
+        return;
+      }
+      if (shouldSkipUpdate(ctx)) {
+        return;
+      }
+
+      const chatId = reactionCount.chat.id;
+      const messageId = reactionCount.message_id;
+      const isGroup =
+        reactionCount.chat.type === "group" || reactionCount.chat.type === "supergroup";
+      const isForum = reactionCount.chat.is_forum === true;
+      const reactionDiagPrefix = `[telegram-reaction-count-diag] account=${accountId} chat=${chatId} msg=${messageId}`;
+
+      const reactionMode = telegramCfg.reactionNotifications ?? "own";
+      runtime.error?.(
+        `${reactionDiagPrefix} stage=entry mode=${reactionMode} isGroup=${isGroup} isForum=${isForum}`,
+      );
+      if (reactionMode === "off") {
+        return;
+      }
+      if (reactionMode === "own" && !telegramDeps.wasSentByBot(chatId, messageId)) {
+        return;
+      }
+
+      // Focused fallback: only DM reaction-count updates.
+      if (isGroup) {
+        return;
+      }
+
+      const eventAuthContext = await resolveTelegramEventAuthorizationContext({
+        chatId,
+        isGroup,
+        isForum,
+      });
+      if (eventAuthContext.dmPolicy === "disabled") {
+        runtime.error?.(`${reactionDiagPrefix} stage=auth-deny reason=direct-disabled`);
+        return;
+      }
+
+      const requireTopic = (eventAuthContext.groupConfig as TelegramDirectConfig | undefined)
+        ?.requireTopic;
+      if (requireTopic === true) {
+        logVerbose(
+          `Blocked telegram reaction_count in DM ${chatId}: requireTopic=true but topic unknown for reactions`,
+        );
+        return;
+      }
+
+      const summaryParts = (reactionCount.reactions ?? []).map((entry) => {
+        const count = typeof entry.total_count === "number" ? entry.total_count : 0;
+        if (entry.type === "emoji") {
+          return `${entry.emoji}:${count}`;
+        }
+        if (entry.type === "custom_emoji") {
+          return `custom:${entry.custom_emoji_id}:${count}`;
+        }
+        return `${entry.type}:${count}`;
+      });
+      const summary = summaryParts.length > 0 ? summaryParts.join(",") : "none";
+
+      const peerId = String(chatId);
+      const parentPeer = buildTelegramParentPeer({
+        isGroup,
+        resolvedThreadId: undefined,
+        chatId,
+      });
+      const route = resolveAgentRoute({
+        cfg: telegramDeps.loadConfig(),
+        channel: "telegram",
+        accountId,
+        peer: { kind: "direct", id: peerId },
+        parentPeer,
+      });
+      const sessionKey = route.sessionKey;
+
+      const contextKey = `telegram:reaction:count:${chatId}:${messageId}:${summary}`;
+      const text = `Telegram reaction count changed on msg ${messageId}: ${summary}`;
+      telegramDeps.enqueueSystemEvent(text, {
+        sessionKey,
+        contextKey,
+      });
+      runtime.error?.(
+        `${reactionDiagPrefix} stage=enqueued session=${sessionKey ?? "default"} summary=${summary}`,
+      );
+
+      if (telegramCfg.reactionTrigger === true) {
+        requestHeartbeatNow({
+          reason: "telegram-reaction",
+          sessionKey,
+          coalesceMs: 500,
+        });
+        runtime.error?.(
+          `${reactionDiagPrefix} stage=wake reason=telegram-reaction session=${sessionKey ?? "default"}`,
+        );
+      }
+    } catch (err) {
+      runtime.error?.(danger(`telegram reaction_count handler failed: ${String(err)}`));
+    }
+  });
+
   const processInboundMessage = async (params: {
     ctx: TelegramContext;
     msg: Message;
