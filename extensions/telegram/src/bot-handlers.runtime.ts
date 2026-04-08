@@ -844,16 +844,25 @@ export const registerTelegramHandlers = ({
         isGroup,
         isForum,
       });
-      const senderAuthorization = authorizeTelegramEventSender({
-        chatId,
-        chatTitle: reaction.chat.title,
-        isGroup,
-        senderId,
-        senderUsername,
-        mode: "reaction",
-        context: eventAuthContext,
-      });
+      const missingSenderInDirectReaction = !isGroup && !senderId;
+      const senderAuthorization: TelegramEventAuthorizationResult = missingSenderInDirectReaction
+        ? { allowed: true }
+        : authorizeTelegramEventSender({
+            chatId,
+            chatTitle: reaction.chat.title,
+            isGroup,
+            senderId,
+            senderUsername,
+            mode: "reaction",
+            context: eventAuthContext,
+          });
+      if (missingSenderInDirectReaction) {
+        runtime.error?.(
+          `${reactionDiagPrefix} stage=auth-bypass reason=missing-sender-in-direct-reaction`,
+        );
+      }
       if (!senderAuthorization.allowed) {
+        runtime.error?.(`${reactionDiagPrefix} stage=auth-deny reason=${senderAuthorization.reason}`);
         return;
       }
 
