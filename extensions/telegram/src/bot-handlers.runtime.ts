@@ -795,9 +795,13 @@ export const registerTelegramHandlers = ({
       const senderUsername = user?.username ?? "";
       const isGroup = reaction.chat.type === "group" || reaction.chat.type === "supergroup";
       const isForum = reaction.chat.is_forum === true;
+      const reactionDiagPrefix = `[telegram-reaction-diag] account=${accountId} chat=${chatId} msg=${messageId} sender=${senderId || "anon"}`;
 
       // Resolve reaction notification mode (default: "own").
       const reactionMode = telegramCfg.reactionNotifications ?? "own";
+      runtime.info?.(
+        `${reactionDiagPrefix} stage=entry mode=${reactionMode} isGroup=${isGroup} isForum=${isForum}`,
+      );
       if (reactionMode === "off") {
         return;
       }
@@ -902,16 +906,25 @@ export const registerTelegramHandlers = ({
         parentPeer,
       });
       const sessionKey = route.sessionKey;
+      runtime.info?.(
+        `${reactionDiagPrefix} stage=route session=${sessionKey ?? "default"} added=${addedReactions
+          .map((r) => r.emoji)
+          .join(",")}`,
+      );
 
       // Enqueue system event for each added reaction.
       for (const r of addedReactions) {
         const emoji = r.emoji;
+        const contextKey = `telegram:reaction:add:${chatId}:${messageId}:${user?.id ?? "anon"}:${emoji}`;
         const text = `Telegram reaction added: ${emoji} by ${senderLabel} on msg ${messageId}`;
         telegramDeps.enqueueSystemEvent(text, {
           sessionKey,
-          contextKey: `telegram:reaction:add:${chatId}:${messageId}:${user?.id ?? "anon"}:${emoji}`,
+          contextKey,
         });
         logVerbose(`telegram: reaction event enqueued: ${text}`);
+        runtime.info?.(
+          `${reactionDiagPrefix} stage=enqueued session=${sessionKey ?? "default"} emoji=${emoji} context=${contextKey}`,
+        );
       }
 
       // When reactionTrigger is enabled, wake the agent so the reaction
@@ -925,6 +938,9 @@ export const registerTelegramHandlers = ({
           coalesceMs: 500,
         });
         logVerbose(`telegram: reaction trigger woke agent for session ${sessionKey}`);
+        runtime.info?.(
+          `${reactionDiagPrefix} stage=wake reason=telegram-reaction session=${sessionKey ?? "default"}`,
+        );
         if (reactionTestMode) {
           runtime.info?.(`telegram reaction trigger woke agent for session ${sessionKey}`);
         }
