@@ -780,9 +780,11 @@ export const registerTelegramHandlers = ({
   // Raw ingress diagnostics for Telegram reaction updates.
   // This confirms whether message_reaction/message_reaction_count updates
   // are observed in-process before specialized handlers run.
-  // Use the same sink family as polling-runner diagnostics (`runtime.error`) so
-  // lines appear alongside `[telegram-runner-*]` transport logs.
-  const reactionPipelineDiag = runtime.error ?? runtime.info;
+  // Keep disabled by default; enable with explicit env flags when debugging.
+  const reactionDiagEnabled =
+    process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_HANDLER === "1" ||
+    process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_POLL === "1";
+  const reactionPipelineDiag = reactionDiagEnabled ? (runtime.error ?? runtime.info) : undefined;
   bot.use(async (ctx, next) => {
     const middlewareDiagAll = process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_POLL === "1";
     const typedUpdate = (ctx.update ?? {}) as Record<string, unknown>;
@@ -1050,7 +1052,7 @@ export const registerTelegramHandlers = ({
       const reactionDiagPrefix = `[telegram-reaction-count-diag] account=${accountId} chat=${chatId} msg=${messageId}`;
 
       const reactionMode = telegramCfg.reactionNotifications ?? "own";
-      runtime.error?.(
+      reactionPipelineDiag?.(
         `${reactionDiagPrefix} stage=entry mode=${reactionMode} isGroup=${isGroup} isForum=${isForum}`,
       );
       if (reactionMode === "off") {
@@ -1071,7 +1073,7 @@ export const registerTelegramHandlers = ({
         isForum,
       });
       if (eventAuthContext.dmPolicy === "disabled") {
-        runtime.error?.(`${reactionDiagPrefix} stage=auth-deny reason=direct-disabled`);
+        reactionPipelineDiag?.(`${reactionDiagPrefix} stage=auth-deny reason=direct-disabled`);
         return;
       }
 
@@ -1123,7 +1125,7 @@ export const registerTelegramHandlers = ({
         contextKey,
         deliveryContext: reactionDeliveryContext,
       });
-      runtime.error?.(
+      reactionPipelineDiag?.(
         `${reactionDiagPrefix} stage=enqueued session=${sessionKey ?? "default"} summary=${summary} delivery_to=${reactionDeliveryContext.to}`,
       );
 
@@ -1133,7 +1135,7 @@ export const registerTelegramHandlers = ({
           sessionKey,
           coalesceMs: 500,
         });
-        runtime.error?.(
+        reactionPipelineDiag?.(
           `${reactionDiagPrefix} stage=wake reason=telegram-reaction session=${sessionKey ?? "default"}`,
         );
       }
