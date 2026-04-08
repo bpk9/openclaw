@@ -22,6 +22,9 @@ const POLL_STALL_THRESHOLD_MS = 90_000;
 const POLL_WATCHDOG_INTERVAL_MS = 30_000;
 const POLL_STOP_GRACE_MS = 15_000;
 
+const isTelegramReactionPollDiagEnabled =
+  process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_POLL === "1";
+
 const waitForGracefulStop = async (stop: () => Promise<void>) => {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -260,6 +263,30 @@ export class TelegramPollingSession {
 
       try {
         const result = await prev(method, payload, signal);
+        if (Array.isArray(result) && result.length > 0) {
+          let reactionUpdates = 0;
+          let reactionCountUpdates = 0;
+          for (const update of result) {
+            if (!update || typeof update !== "object") {
+              continue;
+            }
+            if ("message_reaction" in update) {
+              reactionUpdates += 1;
+            }
+            if ("message_reaction_count" in update) {
+              reactionCountUpdates += 1;
+            }
+          }
+          if (
+            isTelegramReactionPollDiagEnabled ||
+            reactionUpdates > 0 ||
+            reactionCountUpdates > 0
+          ) {
+            this.opts.log(
+              `[telegram-poll-ingress] account=${this.opts.accountId} batch=${result.length} reaction=${reactionUpdates} reaction_count=${reactionCountUpdates}`,
+            );
+          }
+        }
         const finishedAt = Date.now();
         lastGetUpdatesFinishedAt = finishedAt;
         lastGetUpdatesDurationMs = finishedAt - startedAt;
