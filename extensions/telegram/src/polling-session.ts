@@ -223,6 +223,62 @@ export class TelegramPollingSession {
     let stopSequenceLogged = false;
     let stallDiagLoggedAt = 0;
 
+    const summarizeUpdateBatch = (updates: unknown[]) => {
+      let reactionUpdates = 0;
+      let reactionCountUpdates = 0;
+      const updateTypeCounts = new Map<string, number>();
+      for (const update of updates) {
+        if (!update || typeof update !== "object") {
+          continue;
+        }
+        if ("message_reaction" in update) {
+          reactionUpdates += 1;
+        }
+        if ("message_reaction_count" in update) {
+          reactionCountUpdates += 1;
+        }
+        for (const [key, value] of Object.entries(update)) {
+          if (key === "update_id" || value === undefined) {
+            continue;
+          }
+          updateTypeCounts.set(key, (updateTypeCounts.get(key) ?? 0) + 1);
+        }
+      }
+      const updateTypes = [...updateTypeCounts.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, count]) => `${key}:${count}`)
+        .join(",");
+      return {
+        reactionUpdates,
+        reactionCountUpdates,
+        updateTypes,
+      };
+    };
+
+    const originalGetUpdates = bot.api.getUpdates.bind(bot.api);
+    (bot.api as { getUpdates: (...args: unknown[]) => Promise<unknown[]> }).getUpdates =
+      async (...args: unknown[]) => {
+        const payload = args[0] as { offset?: number; timeout?: number } | undefined;
+        const offset = typeof payload?.offset === "number" ? payload.offset : null;
+        const timeout = typeof payload?.timeout === "number" ? payload.timeout : null;
+        try {
+          const result = await originalGetUpdates(...(args as [unknown?]));
+          const updates = Array.isArray(result) ? result : [];
+          if (isTelegramReactionPollDiagEnabled || updates.length > 0) {
+            const summary = summarizeUpdateBatch(updates);
+            this.opts.log(
+              `[telegram-runner-source] account=${this.opts.accountId} batch=${updates.length} offset=${offset ?? "n/a"} timeout=${timeout ?? "n/a"} reaction=${summary.reactionUpdates} reaction_count=${summary.reactionCountUpdates} update_types=${summary.updateTypes || "none"}`,
+            );
+          }
+          return result;
+        } catch (err) {
+          this.opts.log(
+            `[telegram-runner-source] account=${this.opts.accountId} error=1 offset=${offset ?? "n/a"} timeout=${timeout ?? "n/a"} err=${formatErrorMessage(err)}`,
+          );
+          throw err;
+        }
+      };
+
     bot.api.config.use(async (prev, method, payload, signal) => {
       if (method !== "getUpdates") {
         const startedAt = Date.now();
