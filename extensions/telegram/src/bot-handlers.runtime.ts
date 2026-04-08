@@ -781,8 +781,26 @@ export const registerTelegramHandlers = ({
   // This confirms whether message_reaction/message_reaction_count updates
   // are observed in-process before specialized handlers run.
   bot.use(async (ctx, next) => {
+    const middlewareDiagAll = process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_POLL === "1";
+    const typedUpdate = (ctx.update ?? {}) as Record<string, unknown>;
+    const updateId = typeof typedUpdate.update_id === "number" ? String(typedUpdate.update_id) : "n/a";
+    const updateTypes = Object.entries(typedUpdate)
+      .filter(([key, value]) => key !== "update_id" && value !== undefined)
+      .map(([key]) => key)
+      .sort((a, b) => a.localeCompare(b))
+      .join(",");
+
     const rawReaction = ctx.update?.message_reaction;
     const rawReactionCount = ctx.update?.message_reaction_count;
+    const parsedReaction = ctx.messageReaction;
+    const parsedReactionCount = ctx.messageReactionCount;
+
+    if (middlewareDiagAll || rawReaction || rawReactionCount || parsedReaction || parsedReactionCount) {
+      runtime.info?.(
+        `[telegram-handler-middleware] account=${accountId} update_id=${updateId} update_types=${updateTypes || "none"} rawReaction=${Boolean(rawReaction)} rawReactionCount=${Boolean(rawReactionCount)} parsedReaction=${Boolean(parsedReaction)} parsedReactionCount=${Boolean(parsedReactionCount)}`,
+      );
+    }
+
     if (rawReaction || rawReactionCount) {
       const chatId = rawReaction?.chat?.id ?? rawReactionCount?.chat?.id ?? "unknown";
       const messageId = rawReaction?.message_id ?? rawReactionCount?.message_id ?? "unknown";
