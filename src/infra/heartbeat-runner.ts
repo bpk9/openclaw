@@ -94,6 +94,8 @@ export type HeartbeatDeps = OutboundSendDeps &
 const log = createSubsystemLogger("gateway/heartbeat");
 let heartbeatRunnerRuntimePromise: Promise<typeof import("./heartbeat-runner.runtime.js")> | null =
   null;
+const isTelegramHeartbeatReactionDiagEnabled =
+  process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_HEARTBEAT === "1";
 
 function loadHeartbeatRunnerRuntime() {
   heartbeatRunnerRuntimePromise ??= import("./heartbeat-runner.runtime.js");
@@ -598,7 +600,7 @@ export async function runHeartbeatOnce(opts: {
     explicitAgentId || forcedSessionAgentId || resolveDefaultAgentId(cfg),
   );
   const isTelegramReactionWake = opts.reason === "telegram-reaction";
-  const reactionWakeDiag = isTelegramReactionWake
+  const reactionWakeDiag = isTelegramReactionWake && isTelegramHeartbeatReactionDiagEnabled
     ? (opts.deps?.runtime?.error ?? opts.deps?.runtime?.info)
     : undefined;
   const heartbeat = opts.heartbeat ?? resolveHeartbeatConfig(cfg, agentId);
