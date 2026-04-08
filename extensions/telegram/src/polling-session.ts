@@ -264,7 +264,7 @@ export class TelegramPollingSession {
         try {
           const result = await originalGetUpdates(...(args as [unknown?]));
           const updates = Array.isArray(result) ? result : [];
-          if (isTelegramReactionPollDiagEnabled || updates.length > 0) {
+          if (isTelegramReactionPollDiagEnabled) {
             const summary = summarizeUpdateBatch(updates);
             this.opts.log(
               `[telegram-runner-source] account=${this.opts.accountId} batch=${updates.length} offset=${offset ?? "n/a"} timeout=${timeout ?? "n/a"} reaction=${summary.reactionUpdates} reaction_count=${summary.reactionCountUpdates} update_types=${summary.updateTypes || "none"}`,
@@ -272,9 +272,11 @@ export class TelegramPollingSession {
           }
           return result;
         } catch (err) {
-          this.opts.log(
-            `[telegram-runner-source] account=${this.opts.accountId} error=1 offset=${offset ?? "n/a"} timeout=${timeout ?? "n/a"} err=${formatErrorMessage(err)}`,
-          );
+          if (isTelegramReactionPollDiagEnabled) {
+            this.opts.log(
+              `[telegram-runner-source] account=${this.opts.accountId} error=1 offset=${offset ?? "n/a"} timeout=${timeout ?? "n/a"} err=${formatErrorMessage(err)}`,
+            );
+          }
           throw err;
         }
       };
@@ -342,11 +344,7 @@ export class TelegramPollingSession {
               updateTypeCounts.set(key, (updateTypeCounts.get(key) ?? 0) + 1);
             }
           }
-          if (
-            isTelegramReactionPollDiagEnabled ||
-            reactionUpdates > 0 ||
-            reactionCountUpdates > 0
-          ) {
+          if (isTelegramReactionPollDiagEnabled) {
             const updateTypes = [...updateTypeCounts.entries()]
               .sort(([a], [b]) => a.localeCompare(b))
               .map(([key, count]) => `${key}:${count}`)
@@ -386,7 +384,6 @@ export class TelegramPollingSession {
         const typedUpdate = update as Record<string, unknown>;
         hasReaction = Object.prototype.hasOwnProperty.call(typedUpdate, "message_reaction");
         hasReactionCount = Object.prototype.hasOwnProperty.call(typedUpdate, "message_reaction_count");
-        shouldLogDispatch = shouldLogDispatch || hasReaction || hasReactionCount;
         updateId = typeof typedUpdate.update_id === "number" ? String(typedUpdate.update_id) : "n/a";
         updateTypes =
           Object.entries(typedUpdate)
