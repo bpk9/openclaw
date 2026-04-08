@@ -597,6 +597,10 @@ export async function runHeartbeatOnce(opts: {
   const agentId = normalizeAgentId(
     explicitAgentId || forcedSessionAgentId || resolveDefaultAgentId(cfg),
   );
+  const isTelegramReactionWake = opts.reason === "telegram-reaction";
+  const reactionWakeDiag = isTelegramReactionWake
+    ? (opts.deps?.runtime?.error ?? opts.deps?.runtime?.info)
+    : undefined;
   const heartbeat = opts.heartbeat ?? resolveHeartbeatConfig(cfg, agentId);
   if (!areHeartbeatsEnabled()) {
     return { status: "skipped", reason: "disabled" };
@@ -635,6 +639,14 @@ export async function runHeartbeatOnce(opts: {
     return { status: "skipped", reason: preflight.skipReason };
   }
   const { entry, sessionKey, storePath } = preflight.session;
+  if (reactionWakeDiag) {
+    const reactionContexts = preflight.pendingEventEntries
+      .map((event) => event.contextKey ?? "")
+      .filter((contextKey) => contextKey.startsWith("telegram:reaction:"));
+    reactionWakeDiag(
+      `[heartbeat-reaction-diag] stage=queue-peek reason=telegram-reaction agent=${agentId} session=${sessionKey} pending_total=${preflight.pendingEventEntries.length} pending_reaction=${reactionContexts.length} reaction_contexts=${reactionContexts.join(",") || "none"}`,
+    );
+  }
 
   // Check the resolved session lane — if it is busy, skip to avoid interrupting
   // an active streaming turn.  The wake-layer retry (heartbeat-wake.ts) will
@@ -844,14 +856,29 @@ export async function runHeartbeatOnce(opts: {
       : { isHeartbeat: true, suppressToolErrorWarnings, bootstrapContextMode };
     const getReplyFromConfig =
       opts.deps?.getReplyFromConfig ?? (await loadHeartbeatRunnerRuntime()).getReplyFromConfig;
+    reactionWakeDiag?.(
+      `[heartbeat-reaction-diag] stage=turn-start reason=telegram-reaction agent=${agentId} session=${runSessionKey} provider=${ctx.Provider} body_chars=${ctx.Body.length}`,
+    );
     const replyResult = await getReplyFromConfig(ctx, replyOpts, cfg);
     const replyPayload = resolveHeartbeatReplyPayload(replyResult);
     const includeReasoning = heartbeat?.includeReasoning === true;
     const reasoningPayloads = includeReasoning
       ? resolveHeartbeatReasoningPayloads(replyResult).filter((payload) => payload !== replyPayload)
       : [];
+    if (reactionWakeDiag) {
+      const remainingEvents = peekSystemEventEntries(runSessionKey);
+      const remainingReactionContexts = remainingEvents
+        .map((event) => event.contextKey ?? "")
+        .filter((contextKey) => contextKey.startsWith("telegram:reaction:"));
+      reactionWakeDiag(
+        `[heartbeat-reaction-diag] stage=queue-post-turn reason=telegram-reaction agent=${agentId} session=${runSessionKey} remaining_total=${remainingEvents.length} remaining_reaction=${remainingReactionContexts.length} remaining_contexts=${remainingReactionContexts.join(",") || "none"}`,
+      );
+    }
 
     if (!replyPayload || !hasOutboundReplyContent(replyPayload)) {
+      reactionWakeDiag?.(
+        `[heartbeat-reaction-diag] stage=outbound-skip reason=empty-reply agent=${agentId} session=${runSessionKey}`,
+      );
       await restoreHeartbeatUpdatedAt({
         storePath,
         sessionKey,
@@ -889,6 +916,9 @@ export async function runHeartbeatOnce(opts: {
     }
     const shouldSkipMain = normalized.shouldSkip && !normalized.hasMedia && !hasExecCompletion;
     if (shouldSkipMain && reasoningPayloads.length === 0) {
+      reactionWakeDiag?.(
+        `[heartbeat-reaction-diag] stage=outbound-skip reason=ok-token agent=${agentId} session=${runSessionKey}`,
+      );
       await restoreHeartbeatUpdatedAt({
         storePath,
         sessionKey,
@@ -956,6 +986,9 @@ export async function runHeartbeatOnce(opts: {
       : normalized.text;
 
     if (delivery.channel === "none" || !delivery.to) {
+      reactionWakeDiag?.(
+        `[heartbeat-reaction-diag] stage=outbound-skip reason=no-target agent=${agentId} session=${runSessionKey} channel=${delivery.channel} to=${delivery.to ?? "none"}`,
+      );
       emitHeartbeatEvent({
         status: "skipped",
         reason: delivery.reason ?? "no-target",
@@ -969,6 +1002,9 @@ export async function runHeartbeatOnce(opts: {
     }
 
     if (!visibility.showAlerts) {
+      reactionWakeDiag?.(
+        `[heartbeat-reaction-diag] stage=outbound-skip reason=alerts-disabled agent=${agentId} session=${runSessionKey}`,
+      );
       await updateTaskTimestamps();
       await restoreHeartbeatUpdatedAt({
         storePath,
@@ -997,6 +1033,9 @@ export async function runHeartbeatOnce(opts: {
         deps: opts.deps,
       });
       if (!readiness.ok) {
+        reactionWakeDiag?.(
+          `[heartbeat-reaction-diag] stage=outbound-skip reason=channel-not-ready agent=${agentId} session=${runSessionKey} channel=${delivery.channel} detail=${readiness.reason}`,
+        );
         emitHeartbeatEvent({
           status: "skipped",
           reason: readiness.reason,
@@ -1014,6 +1053,9 @@ export async function runHeartbeatOnce(opts: {
       }
     }
 
+    reactionWakeDiag?.(
+      `[heartbeat-reaction-diag] stage=outbound-send-start reason=telegram-reaction agent=${agentId} session=${runSessionKey} channel=${delivery.channel} to=${delivery.to} payload_count=${reasoningPayloads.length + (shouldSkipMain ? 0 : 1)} main_text_chars=${shouldSkipMain ? 0 : normalized.text.length} media_count=${mediaUrls.length}`,
+    );
     await deliverOutboundPayloads({
       cfg,
       channel: delivery.channel,
@@ -1034,6 +1076,9 @@ export async function runHeartbeatOnce(opts: {
       ],
       deps: opts.deps,
     });
+    reactionWakeDiag?.(
+      `[heartbeat-reaction-diag] stage=outbound-send-done reason=telegram-reaction agent=${agentId} session=${runSessionKey} channel=${delivery.channel} to=${delivery.to}`,
+    );
 
     // Record last delivered heartbeat payload for dedupe.
     if (!shouldSkipMain && normalized.text.trim()) {
@@ -1063,6 +1108,9 @@ export async function runHeartbeatOnce(opts: {
     return { status: "ran", durationMs: Date.now() - startedAt };
   } catch (err) {
     const reason = formatErrorMessage(err);
+    reactionWakeDiag?.(
+      `[heartbeat-reaction-diag] stage=error reason=telegram-reaction agent=${agentId} session=${runSessionKey} err=${reason}`,
+    );
     emitHeartbeatEvent({
       status: "failed",
       reason,
