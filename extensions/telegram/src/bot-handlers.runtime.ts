@@ -787,22 +787,30 @@ export const registerTelegramHandlers = ({
   const reactionPipelineDiag = reactionDiagEnabled ? (runtime.error ?? runtime.info) : undefined;
   bot.use(async (ctx, next) => {
     const middlewareDiagAll = process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_POLL === "1";
-    const typedUpdate = (ctx.update ?? {}) as Record<string, unknown>;
-    const updateId = typeof typedUpdate.update_id === "number" ? String(typedUpdate.update_id) : "n/a";
-    const updateTypes = Object.entries(typedUpdate)
-      .filter(([key, value]) => key !== "update_id" && value !== undefined)
-      .map(([key]) => key)
-      .sort((a, b) => a.localeCompare(b))
-      .join(",");
-
     const rawReaction = ctx.update?.message_reaction;
     const rawReactionCount = ctx.update?.message_reaction_count;
     const parsedReaction = ctx.messageReaction;
     const parsedReactionCount = ctx.messageReactionCount;
+    const shouldEmitMiddlewareDiag =
+      Boolean(reactionPipelineDiag) &&
+      (middlewareDiagAll || rawReaction || rawReactionCount || parsedReaction || parsedReactionCount);
 
-    if (middlewareDiagAll || rawReaction || rawReactionCount || parsedReaction || parsedReactionCount) {
+    let updateId = "n/a";
+    let updateTypes = "none";
+    if (shouldEmitMiddlewareDiag) {
+      const typedUpdate = (ctx.update ?? {}) as Record<string, unknown>;
+      updateId = typeof typedUpdate.update_id === "number" ? String(typedUpdate.update_id) : "n/a";
+      updateTypes =
+        Object.entries(typedUpdate)
+          .filter(([key, value]) => key !== "update_id" && value !== undefined)
+          .map(([key]) => key)
+          .sort((a, b) => a.localeCompare(b))
+          .join(",") || "none";
+    }
+
+    if (shouldEmitMiddlewareDiag) {
       reactionPipelineDiag?.(
-        `[telegram-handler-middleware] account=${accountId} update_id=${updateId} update_types=${updateTypes || "none"} rawReaction=${Boolean(rawReaction)} rawReactionCount=${Boolean(rawReactionCount)} parsedReaction=${Boolean(parsedReaction)} parsedReactionCount=${Boolean(parsedReactionCount)}`,
+        `[telegram-handler-middleware] account=${accountId} update_id=${updateId} update_types=${updateTypes} rawReaction=${Boolean(rawReaction)} rawReactionCount=${Boolean(rawReactionCount)} parsedReaction=${Boolean(parsedReaction)} parsedReactionCount=${Boolean(parsedReactionCount)}`,
       );
     }
 
