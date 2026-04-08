@@ -777,10 +777,31 @@ export const registerTelegramHandlers = ({
     return { allowed: true };
   };
 
+  // Raw ingress diagnostics for Telegram reaction updates.
+  // This confirms whether message_reaction/message_reaction_count updates
+  // are observed in-process before specialized handlers run.
+  bot.use(async (ctx, next) => {
+    const rawReaction = ctx.update?.message_reaction;
+    const rawReactionCount = ctx.update?.message_reaction_count;
+    if (rawReaction || rawReactionCount) {
+      const chatId = rawReaction?.chat?.id ?? rawReactionCount?.chat?.id ?? "unknown";
+      const messageId = rawReaction?.message_id ?? rawReactionCount?.message_id ?? "unknown";
+      const userId = rawReaction?.user?.id;
+      const addedCount = rawReaction?.new_reaction?.length ?? 0;
+      const countKinds = Array.isArray(rawReactionCount?.reactions)
+        ? rawReactionCount.reactions.length
+        : 0;
+      runtime.info?.(
+        `[telegram-reaction-ingress] account=${accountId} chat=${chatId} msg=${messageId} hasReaction=${Boolean(rawReaction)} hasReactionCount=${Boolean(rawReactionCount)} user=${userId ?? "anon"} addedCount=${addedCount} countKinds=${countKinds}`,
+      );
+    }
+    await next();
+  });
+
   // Handle emoji reactions to messages.
   bot.on("message_reaction", async (ctx) => {
     try {
-      const reaction = ctx.messageReaction;
+      const reaction = ctx.messageReaction ?? ctx.update?.message_reaction;
       if (!reaction) {
         return;
       }
