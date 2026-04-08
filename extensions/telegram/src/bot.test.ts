@@ -2612,6 +2612,12 @@ describe("createTelegramBot", () => {
       expect.objectContaining({
         sessionKey: expect.stringContaining("telegram:group:5678:topic:1"),
         contextKey: expect.stringContaining("telegram:reaction:add:5678:100:10"),
+        deliveryContext: {
+          channel: "telegram",
+          to: "telegram:5678:topic:1",
+          accountId: expect.any(String),
+          threadId: 1,
+        },
       }),
     );
   });
