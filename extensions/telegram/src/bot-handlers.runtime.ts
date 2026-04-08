@@ -852,16 +852,20 @@ export const registerTelegramHandlers = ({
         `${reactionDiagPrefix} stage=entry mode=${reactionMode} isGroup=${isGroup} isForum=${isForum}`,
       );
       if (reactionMode === "off") {
+        reactionPipelineDiag?.(`${reactionDiagPrefix} stage=drop reason=mode-off`);
         return;
       }
       if (user?.is_bot) {
         const allowBotReactionForTesting =
           process.env.OPENCLAW_TELEGRAM_ALLOW_BOT_REACTION_TEST === "1";
         if (!allowBotReactionForTesting) {
+          reactionPipelineDiag?.(`${reactionDiagPrefix} stage=drop reason=user-is-bot`);
           return;
         }
       }
-      if (reactionMode === "own" && !telegramDeps.wasSentByBot(chatId, messageId)) {
+      const ownMessage = telegramDeps.wasSentByBot(chatId, messageId);
+      if (reactionMode === "own" && !ownMessage) {
+        reactionPipelineDiag?.(`${reactionDiagPrefix} stage=drop reason=own-mode-not-bot-message`);
         logVerbose(
           `telegram: skipped reaction on msg ${messageId} in chat ${chatId} (own mode, not sent by bot)`,
         );
@@ -885,12 +889,12 @@ export const registerTelegramHandlers = ({
             context: eventAuthContext,
           });
       if (missingSenderInDirectReaction) {
-        runtime.error?.(
+        reactionPipelineDiag?.(
           `${reactionDiagPrefix} stage=auth-bypass reason=missing-sender-in-direct-reaction`,
         );
       }
       if (!senderAuthorization.allowed) {
-        runtime.error?.(`${reactionDiagPrefix} stage=auth-deny reason=${senderAuthorization.reason}`);
+        reactionPipelineDiag?.(`${reactionDiagPrefix} stage=auth-deny reason=${senderAuthorization.reason}`);
         return;
       }
 
@@ -901,6 +905,7 @@ export const registerTelegramHandlers = ({
         const requireTopic = (eventAuthContext.groupConfig as TelegramDirectConfig | undefined)
           ?.requireTopic;
         if (requireTopic === true) {
+          reactionPipelineDiag?.(`${reactionDiagPrefix} stage=drop reason=direct-require-topic`);
           logVerbose(
             `Blocked telegram reaction in DM ${chatId}: requireTopic=true but topic unknown for reactions`,
           );
@@ -917,6 +922,11 @@ export const registerTelegramHandlers = ({
       const addedReactions = reaction.new_reaction
         .filter((r): r is ReactionTypeEmoji => r.type === "emoji")
         .filter((r) => !oldEmojis.has(r.emoji));
+      reactionPipelineDiag?.(
+        `${reactionDiagPrefix} stage=added oldEmojiCount=${oldEmojis.size} newCount=${reaction.new_reaction.length} addedCount=${addedReactions.length} added=${addedReactions
+          .map((r) => r.emoji)
+          .join(",") || "none"}`,
+      );
 
       const reactionTestMode = process.env.OPENCLAW_TELEGRAM_ALLOW_BOT_REACTION_TEST === "1";
       if (reactionTestMode) {
@@ -928,6 +938,7 @@ export const registerTelegramHandlers = ({
       }
 
       if (addedReactions.length === 0) {
+        reactionPipelineDiag?.(`${reactionDiagPrefix} stage=drop reason=no-added-reactions`);
         return;
       }
 
@@ -964,7 +975,7 @@ export const registerTelegramHandlers = ({
         parentPeer,
       });
       const sessionKey = route.sessionKey;
-      runtime.info?.(
+      reactionPipelineDiag?.(
         `${reactionDiagPrefix} stage=route session=${sessionKey ?? "default"} added=${addedReactions
           .map((r) => r.emoji)
           .join(",")}`,
@@ -980,7 +991,7 @@ export const registerTelegramHandlers = ({
           contextKey,
         });
         logVerbose(`telegram: reaction event enqueued: ${text}`);
-        runtime.info?.(
+        reactionPipelineDiag?.(
           `${reactionDiagPrefix} stage=enqueued session=${sessionKey ?? "default"} emoji=${emoji} context=${contextKey}`,
         );
       }
@@ -996,7 +1007,7 @@ export const registerTelegramHandlers = ({
           coalesceMs: 500,
         });
         logVerbose(`telegram: reaction trigger woke agent for session ${sessionKey}`);
-        runtime.info?.(
+        reactionPipelineDiag?.(
           `${reactionDiagPrefix} stage=wake reason=telegram-reaction session=${sessionKey ?? "default"}`,
         );
         if (reactionTestMode) {
