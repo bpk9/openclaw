@@ -1422,4 +1422,75 @@ describe("runHeartbeatOnce", () => {
       replySpy.mockReset();
     }
   });
+
+  it("falls back to reaction event delivery context when telegram-reaction wakes target-none heartbeat", async () => {
+    const tmpDir = await createCaseDir("hb-telegram-reaction-target-none-fallback");
+    const storePath = path.join(tmpDir, "sessions.json");
+    const cfg: OpenClawConfig = {
+      agents: {
+        defaults: {
+          workspace: tmpDir,
+          heartbeat: { every: "5m", target: "none" },
+        },
+      },
+      channels: { telegram: { allowFrom: ["5232990709"] } },
+      session: { store: storePath },
+    };
+    const sessionKey = resolveMainSessionKey(cfg);
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({
+        [sessionKey]: {
+          sessionId: "sid",
+          updatedAt: Date.now(),
+        },
+      }),
+    );
+    enqueueSystemEvent("Reaction add by user", {
+      sessionKey,
+      contextKey: "telegram:reaction:add:5232990709:100:1",
+      deliveryContext: {
+        channel: "telegram",
+        to: "5232990709",
+      },
+    });
+
+    const replySpy = vi.fn();
+    replySpy.mockResolvedValue({ text: "Got your reaction" });
+    const sendWhatsApp = vi
+      .fn<
+        (to: string, text: string, opts?: unknown) => Promise<{ messageId: string; toJid: string }>
+      >()
+      .mockResolvedValue({ messageId: "w1", toJid: "jid" });
+    const sendTelegram = vi
+      .fn<
+        (
+          to: string,
+          text: string,
+          opts?: unknown,
+        ) => Promise<{ messageId: string; chatId: string }>
+      >()
+      .mockResolvedValue({ messageId: "t1", chatId: "5232990709" });
+
+    try {
+      const res = await runHeartbeatOnce({
+        cfg,
+        reason: "telegram-reaction",
+        deps: {
+          ...createHeartbeatDeps(sendWhatsApp, { getReplyFromConfig: replySpy }),
+          telegram: sendTelegram,
+        },
+      });
+      expect(res.status).toBe("ran");
+      expect(sendTelegram).toHaveBeenCalledTimes(1);
+      expect(sendTelegram).toHaveBeenCalledWith(
+        "5232990709",
+        "Got your reaction",
+        expect.any(Object),
+      );
+      expect(sendWhatsApp).toHaveBeenCalledTimes(0);
+    } finally {
+      replySpy.mockReset();
+    }
+  });
 });

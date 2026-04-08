@@ -670,7 +670,7 @@ export async function runHeartbeatOnce(opts: {
   // sending the full conversation history (~100K tokens) to the LLM.
   // Delivery routing still uses the main session entry (lastChannel, lastTo).
   const useIsolatedSession = heartbeat?.isolatedSession === true;
-  const delivery = resolveHeartbeatDeliveryTarget({
+  let delivery = resolveHeartbeatDeliveryTarget({
     cfg,
     entry,
     heartbeat,
@@ -680,6 +680,29 @@ export async function runHeartbeatOnce(opts: {
     // to stale channels/threads because that base-session event context remains queued.
     turnSource: useIsolatedSession ? undefined : preflight.turnSourceDeliveryContext,
   });
+  if (
+    isTelegramReactionWake &&
+    delivery.channel === "none" &&
+    !useIsolatedSession &&
+    preflight.turnSourceDeliveryContext
+  ) {
+    const reactionFallbackHeartbeat: HeartbeatConfig = {
+      ...(heartbeat ?? {}),
+      target: "last",
+    };
+    const fallbackDelivery = resolveHeartbeatDeliveryTarget({
+      cfg,
+      entry,
+      heartbeat: reactionFallbackHeartbeat,
+      turnSource: preflight.turnSourceDeliveryContext,
+    });
+    if (fallbackDelivery.channel !== "none" && fallbackDelivery.to) {
+      delivery = fallbackDelivery;
+      reactionWakeDiag?.(
+        `[heartbeat-reaction-diag] stage=delivery-fallback reason=telegram-reaction channel=${fallbackDelivery.channel} to=${fallbackDelivery.to}`,
+      );
+    }
+  }
   const heartbeatAccountId = heartbeat?.accountId?.trim();
   if (delivery.reason === "unknown-account") {
     log.warn("heartbeat: unknown accountId", {
