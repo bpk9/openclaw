@@ -780,6 +780,9 @@ export const registerTelegramHandlers = ({
   // Raw ingress diagnostics for Telegram reaction updates.
   // This confirms whether message_reaction/message_reaction_count updates
   // are observed in-process before specialized handlers run.
+  // Use the same sink family as polling-runner diagnostics (`runtime.error`) so
+  // lines appear alongside `[telegram-runner-*]` transport logs.
+  const reactionPipelineDiag = runtime.error ?? runtime.info;
   bot.use(async (ctx, next) => {
     const middlewareDiagAll = process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_POLL === "1";
     const typedUpdate = (ctx.update ?? {}) as Record<string, unknown>;
@@ -796,7 +799,7 @@ export const registerTelegramHandlers = ({
     const parsedReactionCount = ctx.messageReactionCount;
 
     if (middlewareDiagAll || rawReaction || rawReactionCount || parsedReaction || parsedReactionCount) {
-      runtime.info?.(
+      reactionPipelineDiag?.(
         `[telegram-handler-middleware] account=${accountId} update_id=${updateId} update_types=${updateTypes || "none"} rawReaction=${Boolean(rawReaction)} rawReactionCount=${Boolean(rawReactionCount)} parsedReaction=${Boolean(parsedReaction)} parsedReactionCount=${Boolean(parsedReactionCount)}`,
       );
     }
@@ -809,7 +812,7 @@ export const registerTelegramHandlers = ({
       const countKinds = Array.isArray(rawReactionCount?.reactions)
         ? rawReactionCount.reactions.length
         : 0;
-      runtime.info?.(
+      reactionPipelineDiag?.(
         `[telegram-reaction-ingress] account=${accountId} chat=${chatId} msg=${messageId} hasReaction=${Boolean(rawReaction)} hasReactionCount=${Boolean(rawReactionCount)} user=${userId ?? "anon"} addedCount=${addedCount} countKinds=${countKinds}`,
       );
     }
