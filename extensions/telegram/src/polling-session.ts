@@ -266,6 +266,7 @@ export class TelegramPollingSession {
         if (Array.isArray(result) && result.length > 0) {
           let reactionUpdates = 0;
           let reactionCountUpdates = 0;
+          const updateTypeCounts = new Map<string, number>();
           for (const update of result) {
             if (!update || typeof update !== "object") {
               continue;
@@ -276,14 +277,24 @@ export class TelegramPollingSession {
             if ("message_reaction_count" in update) {
               reactionCountUpdates += 1;
             }
+            for (const [key, value] of Object.entries(update)) {
+              if (key === "update_id" || value === undefined) {
+                continue;
+              }
+              updateTypeCounts.set(key, (updateTypeCounts.get(key) ?? 0) + 1);
+            }
           }
           if (
             isTelegramReactionPollDiagEnabled ||
             reactionUpdates > 0 ||
             reactionCountUpdates > 0
           ) {
+            const updateTypes = [...updateTypeCounts.entries()]
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([key, count]) => `${key}:${count}`)
+              .join(",");
             this.opts.log(
-              `[telegram-poll-ingress] account=${this.opts.accountId} batch=${result.length} reaction=${reactionUpdates} reaction_count=${reactionCountUpdates}`,
+              `[telegram-poll-ingress] account=${this.opts.accountId} batch=${result.length} reaction=${reactionUpdates} reaction_count=${reactionCountUpdates} update_types=${updateTypes || "none"}`,
             );
           }
         }
