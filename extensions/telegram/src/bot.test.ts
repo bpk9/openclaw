@@ -2119,6 +2119,45 @@ describe("createTelegramBot", () => {
     expect(reactionHandler).toBeDefined();
   });
 
+  it("enqueues reaction_count fallback with delivery context", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction_count") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 499 },
+      messageReactionCount: {
+        chat: { id: 1234, type: "private" },
+        message_id: 41,
+        date: 1736380800,
+        reactions: [{ type: "emoji", emoji: FIRE_EMOJI, total_count: 1 }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      `Telegram reaction count changed on msg 41: ${FIRE_EMOJI}:1`,
+      expect.objectContaining({
+        contextKey: expect.stringContaining(`telegram:reaction:count:1234:41:${FIRE_EMOJI}:1`),
+        deliveryContext: {
+          channel: "telegram",
+          to: "telegram:1234",
+          accountId: expect.any(String),
+        },
+      }),
+    );
+  });
+
   it("enqueues system event for reaction", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();
