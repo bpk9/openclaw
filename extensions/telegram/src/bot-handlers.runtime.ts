@@ -981,6 +981,16 @@ export const registerTelegramHandlers = ({
           .join(",")}`,
       );
 
+      const reactionDeliveryContext = {
+        channel: "telegram",
+        to:
+          resolvedThreadId != null
+            ? `telegram:${chatId}:topic:${resolvedThreadId}`
+            : `telegram:${chatId}`,
+        accountId,
+        ...(resolvedThreadId != null ? { threadId: resolvedThreadId } : {}),
+      };
+
       // Enqueue system event for each added reaction.
       for (const r of addedReactions) {
         const emoji = r.emoji;
@@ -989,10 +999,11 @@ export const registerTelegramHandlers = ({
         telegramDeps.enqueueSystemEvent(text, {
           sessionKey,
           contextKey,
+          deliveryContext: reactionDeliveryContext,
         });
         logVerbose(`telegram: reaction event enqueued: ${text}`);
         reactionPipelineDiag?.(
-          `${reactionDiagPrefix} stage=enqueued session=${sessionKey ?? "default"} emoji=${emoji} context=${contextKey}`,
+          `${reactionDiagPrefix} stage=enqueued session=${sessionKey ?? "default"} emoji=${emoji} context=${contextKey} delivery_to=${reactionDeliveryContext.to} delivery_thread=${reactionDeliveryContext.threadId ?? "none"}`,
         );
       }
 
@@ -1102,12 +1113,18 @@ export const registerTelegramHandlers = ({
 
       const contextKey = `telegram:reaction:count:${chatId}:${messageId}:${summary}`;
       const text = `Telegram reaction count changed on msg ${messageId}: ${summary}`;
+      const reactionDeliveryContext = {
+        channel: "telegram",
+        to: `telegram:${chatId}`,
+        accountId,
+      };
       telegramDeps.enqueueSystemEvent(text, {
         sessionKey,
         contextKey,
+        deliveryContext: reactionDeliveryContext,
       });
       runtime.error?.(
-        `${reactionDiagPrefix} stage=enqueued session=${sessionKey ?? "default"} summary=${summary}`,
+        `${reactionDiagPrefix} stage=enqueued session=${sessionKey ?? "default"} summary=${summary} delivery_to=${reactionDeliveryContext.to}`,
       );
 
       if (telegramCfg.reactionTrigger === true) {
