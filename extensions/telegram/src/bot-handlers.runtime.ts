@@ -937,7 +937,7 @@ export const registerTelegramHandlers = ({
         addedReactions.length > 0
           ? addedReactions
           : nextEmojiReactions.length > 0
-            ? [nextEmojiReactions[0]]
+            ? [nextEmojiReactions[nextEmojiReactions.length - 1]]
             : [];
       reactionPipelineDiag?.(
         `${reactionDiagPrefix} stage=added oldEmojiCount=${oldEmojis.size} newCount=${reaction.new_reaction.length} addedCount=${addedReactions.length} effectiveAddedCount=${effectiveAddedReactions.length} fallbackNoop=${addedReactions.length === 0 && effectiveAddedReactions.length > 0} added=${effectiveAddedReactions
