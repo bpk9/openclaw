@@ -853,8 +853,25 @@ export const registerTelegramHandlers = ({
 
       const reactionEnvelope = reaction as {
         chat?: { id?: number; type?: string; is_forum?: boolean; title?: string };
+        chat_id?: number | string;
+        chatId?: number | string;
+        chat_type?: string;
+        chatType?: string;
+        is_forum?: boolean;
+        isForum?: boolean;
+        chat_title?: string;
+        chatTitle?: string;
         message_id?: number;
         messageId?: number;
+        user_id?: number | string;
+        userId?: number | string;
+        username?: string;
+        first_name?: string;
+        firstName?: string;
+        last_name?: string;
+        lastName?: string;
+        is_bot?: boolean;
+        isBot?: boolean;
         user?: {
           id?: number;
           username?: string;
@@ -866,8 +883,25 @@ export const registerTelegramHandlers = ({
       const rawReactionEnvelope = rawReaction as
         | {
             chat?: { id?: number; type?: string; is_forum?: boolean; title?: string };
+            chat_id?: number | string;
+            chatId?: number | string;
+            chat_type?: string;
+            chatType?: string;
+            is_forum?: boolean;
+            isForum?: boolean;
+            chat_title?: string;
+            chatTitle?: string;
             message_id?: number;
             messageId?: number;
+            user_id?: number | string;
+            userId?: number | string;
+            username?: string;
+            first_name?: string;
+            firstName?: string;
+            last_name?: string;
+            lastName?: string;
+            is_bot?: boolean;
+            isBot?: boolean;
             user?: {
               id?: number;
               username?: string;
@@ -877,14 +911,81 @@ export const registerTelegramHandlers = ({
             };
           }
         | undefined;
-      const reactionChat = reactionEnvelope.chat ?? rawReactionEnvelope?.chat;
+      const parseNumericId = (value: unknown): number | undefined => {
+        if (typeof value === "number" && Number.isFinite(value)) {
+          return value;
+        }
+        if (typeof value === "string" && value.trim().length > 0) {
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : undefined;
+        }
+        return undefined;
+      };
+      const reactionChat =
+        reactionEnvelope.chat ??
+        rawReactionEnvelope?.chat ??
+        (() => {
+          const flattenedChatId =
+            parseNumericId(reactionEnvelope.chat_id ?? reactionEnvelope.chatId) ??
+            parseNumericId(rawReactionEnvelope?.chat_id ?? rawReactionEnvelope?.chatId);
+          if (flattenedChatId == null) {
+            return undefined;
+          }
+          return {
+            id: flattenedChatId,
+            type:
+              reactionEnvelope.chat_type ??
+              reactionEnvelope.chatType ??
+              rawReactionEnvelope?.chat_type ??
+              rawReactionEnvelope?.chatType,
+            is_forum:
+              reactionEnvelope.is_forum ??
+              reactionEnvelope.isForum ??
+              rawReactionEnvelope?.is_forum ??
+              rawReactionEnvelope?.isForum,
+            title:
+              reactionEnvelope.chat_title ??
+              reactionEnvelope.chatTitle ??
+              rawReactionEnvelope?.chat_title ??
+              rawReactionEnvelope?.chatTitle,
+          };
+        })();
       const messageId =
-        reactionEnvelope.message_id ??
-        reactionEnvelope.messageId ??
-        rawReactionEnvelope?.message_id ??
-        rawReactionEnvelope?.messageId;
-      const user = reactionEnvelope.user ?? rawReactionEnvelope?.user;
-      const chatId = reactionChat?.id;
+        parseNumericId(reactionEnvelope.message_id ?? reactionEnvelope.messageId) ??
+        parseNumericId(rawReactionEnvelope?.message_id ?? rawReactionEnvelope?.messageId);
+      const user =
+        reactionEnvelope.user ??
+        rawReactionEnvelope?.user ??
+        (() => {
+          const flattenedUserId =
+            parseNumericId(reactionEnvelope.user_id ?? reactionEnvelope.userId) ??
+            parseNumericId(rawReactionEnvelope?.user_id ?? rawReactionEnvelope?.userId);
+          if (flattenedUserId == null) {
+            return undefined;
+          }
+          return {
+            id: flattenedUserId,
+            username:
+              reactionEnvelope.username ??
+              rawReactionEnvelope?.username,
+            is_bot:
+              reactionEnvelope.is_bot ??
+              reactionEnvelope.isBot ??
+              rawReactionEnvelope?.is_bot ??
+              rawReactionEnvelope?.isBot,
+            first_name:
+              reactionEnvelope.first_name ??
+              reactionEnvelope.firstName ??
+              rawReactionEnvelope?.first_name ??
+              rawReactionEnvelope?.firstName,
+            last_name:
+              reactionEnvelope.last_name ??
+              reactionEnvelope.lastName ??
+              rawReactionEnvelope?.last_name ??
+              rawReactionEnvelope?.lastName,
+          };
+        })();
+      const chatId = parseNumericId(reactionChat?.id);
       if (!reactionChat || chatId == null || messageId == null) {
         reactionPipelineDiag?.(
           `[telegram-reaction-diag] account=${accountId} stage=drop reason=missing-reaction-envelope hasChat=${Boolean(reactionChat)} hasChatId=${chatId != null} hasMessageId=${messageId != null}`,
@@ -1251,6 +1352,14 @@ export const registerTelegramHandlers = ({
 
       const reactionCountEnvelope = reactionCount as {
         chat?: { id?: number; type?: string; is_forum?: boolean; title?: string };
+        chat_id?: number | string;
+        chatId?: number | string;
+        chat_type?: string;
+        chatType?: string;
+        is_forum?: boolean;
+        isForum?: boolean;
+        chat_title?: string;
+        chatTitle?: string;
         message_id?: number;
         messageId?: number;
         reactions?: unknown;
@@ -1259,19 +1368,63 @@ export const registerTelegramHandlers = ({
       const rawReactionCountEnvelope = rawReactionCount as
         | {
             chat?: { id?: number; type?: string; is_forum?: boolean; title?: string };
+            chat_id?: number | string;
+            chatId?: number | string;
+            chat_type?: string;
+            chatType?: string;
+            is_forum?: boolean;
+            isForum?: boolean;
+            chat_title?: string;
+            chatTitle?: string;
             message_id?: number;
             messageId?: number;
             reactions?: unknown;
             reaction?: unknown;
           }
         | undefined;
-      const reactionChat = reactionCountEnvelope.chat ?? rawReactionCountEnvelope?.chat;
-      const chatId = reactionChat?.id;
+      const parseNumericId = (value: unknown): number | undefined => {
+        if (typeof value === "number" && Number.isFinite(value)) {
+          return value;
+        }
+        if (typeof value === "string" && value.trim().length > 0) {
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : undefined;
+        }
+        return undefined;
+      };
+      const reactionChat =
+        reactionCountEnvelope.chat ??
+        rawReactionCountEnvelope?.chat ??
+        (() => {
+          const flattenedChatId =
+            parseNumericId(reactionCountEnvelope.chat_id ?? reactionCountEnvelope.chatId) ??
+            parseNumericId(rawReactionCountEnvelope?.chat_id ?? rawReactionCountEnvelope?.chatId);
+          if (flattenedChatId == null) {
+            return undefined;
+          }
+          return {
+            id: flattenedChatId,
+            type:
+              reactionCountEnvelope.chat_type ??
+              reactionCountEnvelope.chatType ??
+              rawReactionCountEnvelope?.chat_type ??
+              rawReactionCountEnvelope?.chatType,
+            is_forum:
+              reactionCountEnvelope.is_forum ??
+              reactionCountEnvelope.isForum ??
+              rawReactionCountEnvelope?.is_forum ??
+              rawReactionCountEnvelope?.isForum,
+            title:
+              reactionCountEnvelope.chat_title ??
+              reactionCountEnvelope.chatTitle ??
+              rawReactionCountEnvelope?.chat_title ??
+              rawReactionCountEnvelope?.chatTitle,
+          };
+        })();
+      const chatId = parseNumericId(reactionChat?.id);
       const messageId =
-        reactionCountEnvelope.message_id ??
-        reactionCountEnvelope.messageId ??
-        rawReactionCountEnvelope?.message_id ??
-        rawReactionCountEnvelope?.messageId;
+        parseNumericId(reactionCountEnvelope.message_id ?? reactionCountEnvelope.messageId) ??
+        parseNumericId(rawReactionCountEnvelope?.message_id ?? rawReactionCountEnvelope?.messageId);
       if (!reactionChat || chatId == null || messageId == null) {
         reactionPipelineDiag?.(
           `[telegram-reaction-count-diag] account=${accountId} stage=drop reason=missing-reaction-envelope hasChat=${Boolean(
