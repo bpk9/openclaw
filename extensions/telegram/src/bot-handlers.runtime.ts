@@ -1338,6 +1338,8 @@ export const registerTelegramHandlers = ({
             reactionList?: unknown;
             items?: unknown;
             values?: unknown;
+            data?: unknown;
+            payload?: unknown;
           };
           const nestedCandidates = [
             wrapped.reactions,
@@ -1346,6 +1348,8 @@ export const registerTelegramHandlers = ({
             wrapped.reactionList,
             wrapped.items,
             wrapped.values,
+            wrapped.data,
+            wrapped.payload,
           ];
           for (const nestedCandidate of nestedCandidates) {
             if (nestedCandidate == null || nestedCandidate === candidate) {
