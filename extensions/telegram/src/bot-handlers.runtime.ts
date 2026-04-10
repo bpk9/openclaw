@@ -942,12 +942,12 @@ export const registerTelegramHandlers = ({
         }
         return null;
       };
+      const oldReactionValues = Array.isArray(reaction.old_reaction) ? reaction.old_reaction : [];
+      const newReactionValues = Array.isArray(reaction.new_reaction) ? reaction.new_reaction : [];
       const oldReactionKeys = new Set(
-        reaction.old_reaction.map(normalizeReaction).flatMap((r) => (r ? [r.key] : [])),
+        oldReactionValues.map(normalizeReaction).flatMap((r) => (r ? [r.key] : [])),
       );
-      const nextReactions = reaction.new_reaction
-        .map(normalizeReaction)
-        .flatMap((r) => (r ? [r] : []));
+      const nextReactions = newReactionValues.map(normalizeReaction).flatMap((r) => (r ? [r] : []));
       const addedReactions = nextReactions.filter((r) => !oldReactionKeys.has(r.key));
       const effectiveAddedReactions =
         addedReactions.length > 0
@@ -956,7 +956,7 @@ export const registerTelegramHandlers = ({
             ? [nextReactions[nextReactions.length - 1]]
             : [];
       reactionPipelineDiag?.(
-        `${reactionDiagPrefix} stage=added oldReactionCount=${oldReactionKeys.size} newCount=${reaction.new_reaction.length} addedCount=${addedReactions.length} effectiveAddedCount=${effectiveAddedReactions.length} fallbackNoop=${addedReactions.length === 0 && effectiveAddedReactions.length > 0} added=${effectiveAddedReactions
+        `${reactionDiagPrefix} stage=added oldReactionCount=${oldReactionKeys.size} newCount=${newReactionValues.length} addedCount=${addedReactions.length} effectiveAddedCount=${effectiveAddedReactions.length} fallbackNoop=${addedReactions.length === 0 && effectiveAddedReactions.length > 0} added=${effectiveAddedReactions
           .map((r) => r.display)
           .join(",") || "none"}`,
       );
