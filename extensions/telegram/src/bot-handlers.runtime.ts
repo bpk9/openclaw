@@ -1132,6 +1132,7 @@ export const registerTelegramHandlers = ({
         const reactionValue = value as {
           type?: string;
           emoji?: string;
+          emoticon?: string;
           custom_emoji_id?: unknown;
           custom_emoji?: unknown;
           customEmojiId?: unknown;
@@ -1171,7 +1172,9 @@ export const registerTelegramHandlers = ({
         const emojiValue =
           typeof reactionValue.emoji === "string" && reactionValue.emoji.length > 0
             ? reactionValue.emoji
-            : undefined;
+            : typeof reactionValue.emoticon === "string" && reactionValue.emoticon.length > 0
+              ? reactionValue.emoticon
+              : undefined;
         if (normalizedReactionType === "emoji" && emojiValue) {
           return { key: `emoji:${emojiValue}`, display: emojiValue };
         }
