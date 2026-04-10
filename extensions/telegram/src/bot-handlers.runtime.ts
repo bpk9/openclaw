@@ -1289,6 +1289,10 @@ export const registerTelegramHandlers = ({
         new_reaction?: unknown;
         old_reactions?: unknown;
         new_reactions?: unknown;
+        previous_reaction?: unknown;
+        current_reaction?: unknown;
+        previous_reactions?: unknown;
+        current_reactions?: unknown;
         old?: unknown;
         new?: unknown;
         reaction?: unknown;
@@ -1297,6 +1301,10 @@ export const registerTelegramHandlers = ({
         newReaction?: unknown;
         oldReactions?: unknown;
         newReactions?: unknown;
+        previousReaction?: unknown;
+        currentReaction?: unknown;
+        previousReactions?: unknown;
+        currentReactions?: unknown;
       };
       const rawReactionArrays = rawReaction as
         | {
@@ -1304,6 +1312,10 @@ export const registerTelegramHandlers = ({
             new_reaction?: unknown;
             old_reactions?: unknown;
             new_reactions?: unknown;
+            previous_reaction?: unknown;
+            current_reaction?: unknown;
+            previous_reactions?: unknown;
+            current_reactions?: unknown;
             old?: unknown;
             new?: unknown;
             reaction?: unknown;
@@ -1312,6 +1324,10 @@ export const registerTelegramHandlers = ({
             newReaction?: unknown;
             oldReactions?: unknown;
             newReactions?: unknown;
+            previousReaction?: unknown;
+            currentReaction?: unknown;
+            previousReactions?: unknown;
+            currentReactions?: unknown;
           }
         | undefined;
       const coerceReactionArrayCandidate = (value: unknown): unknown[] | null => {
@@ -1412,30 +1428,46 @@ export const registerTelegramHandlers = ({
       const oldReactionValues = resolveReactionArray(
         reactionArrays.old_reaction,
         reactionArrays.old_reactions,
+        reactionArrays.previous_reaction,
+        reactionArrays.previous_reactions,
         reactionArrays.old,
         reactionArrays.oldReaction,
         reactionArrays.oldReactions,
+        reactionArrays.previousReaction,
+        reactionArrays.previousReactions,
         rawReactionArrays?.old_reaction,
         rawReactionArrays?.old_reactions,
+        rawReactionArrays?.previous_reaction,
+        rawReactionArrays?.previous_reactions,
         rawReactionArrays?.old,
         rawReactionArrays?.oldReaction,
         rawReactionArrays?.oldReactions,
+        rawReactionArrays?.previousReaction,
+        rawReactionArrays?.previousReactions,
       );
       const newReactionValues = resolveReactionArray(
         reactionArrays.new_reaction,
         reactionArrays.new_reactions,
+        reactionArrays.current_reaction,
+        reactionArrays.current_reactions,
         reactionArrays.new,
         reactionArrays.reaction,
         reactionArrays.reactions,
         reactionArrays.newReaction,
         reactionArrays.newReactions,
+        reactionArrays.currentReaction,
+        reactionArrays.currentReactions,
         rawReactionArrays?.new_reaction,
         rawReactionArrays?.new_reactions,
+        rawReactionArrays?.current_reaction,
+        rawReactionArrays?.current_reactions,
         rawReactionArrays?.new,
         rawReactionArrays?.reaction,
         rawReactionArrays?.reactions,
         rawReactionArrays?.newReaction,
         rawReactionArrays?.newReactions,
+        rawReactionArrays?.currentReaction,
+        rawReactionArrays?.currentReactions,
       );
       const oldReactionKeys = new Set(
         oldReactionValues.map(normalizeReaction).flatMap((r) => (r ? [r.key] : [])),
