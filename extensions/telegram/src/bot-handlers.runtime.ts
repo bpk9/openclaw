@@ -1,4 +1,4 @@
-import type { Message, ReactionTypeEmoji } from "@grammyjs/types";
+import type { Message } from "@grammyjs/types";
 import { requestHeartbeatNow } from "openclaw/plugin-sdk/channel-runtime";
 import { resolveChannelConfigWrites } from "openclaw/plugin-sdk/channel-config-helpers";
 import { shouldDebounceTextInbound } from "openclaw/plugin-sdk/channel-inbound";
@@ -923,25 +923,41 @@ export const registerTelegramHandlers = ({
         }
       }
 
-      // Detect added reactions.
-      const oldEmojis = new Set(
-        reaction.old_reaction
-          .filter((r): r is ReactionTypeEmoji => r.type === "emoji")
-          .map((r) => r.emoji),
+      // Detect added reactions (emoji + custom emoji).
+      const normalizeReaction = (
+        value: (typeof reaction.new_reaction)[number],
+      ): { key: string; display: string } | null => {
+        if (value.type === "emoji") {
+          return { key: `emoji:${value.emoji}`, display: value.emoji };
+        }
+        if (
+          value.type === "custom_emoji" &&
+          typeof value.custom_emoji_id === "string" &&
+          value.custom_emoji_id.length > 0
+        ) {
+          return {
+            key: `custom_emoji:${value.custom_emoji_id}`,
+            display: `custom_emoji:${value.custom_emoji_id}`,
+          };
+        }
+        return null;
+      };
+      const oldReactionKeys = new Set(
+        reaction.old_reaction.map(normalizeReaction).flatMap((r) => (r ? [r.key] : [])),
       );
-      const nextEmojiReactions = reaction.new_reaction.filter(
-        (r): r is ReactionTypeEmoji => r.type === "emoji",
-      );
-      const addedReactions = nextEmojiReactions.filter((r) => !oldEmojis.has(r.emoji));
+      const nextReactions = reaction.new_reaction
+        .map(normalizeReaction)
+        .flatMap((r) => (r ? [r] : []));
+      const addedReactions = nextReactions.filter((r) => !oldReactionKeys.has(r.key));
       const effectiveAddedReactions =
         addedReactions.length > 0
           ? addedReactions
-          : nextEmojiReactions.length > 0
-            ? [nextEmojiReactions[nextEmojiReactions.length - 1]]
+          : nextReactions.length > 0
+            ? [nextReactions[nextReactions.length - 1]]
             : [];
       reactionPipelineDiag?.(
-        `${reactionDiagPrefix} stage=added oldEmojiCount=${oldEmojis.size} newCount=${reaction.new_reaction.length} addedCount=${addedReactions.length} effectiveAddedCount=${effectiveAddedReactions.length} fallbackNoop=${addedReactions.length === 0 && effectiveAddedReactions.length > 0} added=${effectiveAddedReactions
-          .map((r) => r.emoji)
+        `${reactionDiagPrefix} stage=added oldReactionCount=${oldReactionKeys.size} newCount=${reaction.new_reaction.length} addedCount=${addedReactions.length} effectiveAddedCount=${effectiveAddedReactions.length} fallbackNoop=${addedReactions.length === 0 && effectiveAddedReactions.length > 0} added=${effectiveAddedReactions
+          .map((r) => r.display)
           .join(",") || "none"}`,
       );
 
@@ -949,7 +965,7 @@ export const registerTelegramHandlers = ({
       if (reactionTestMode) {
         runtime.info?.(
           `telegram reaction event received chat=${chatId} msg=${messageId} userBot=${Boolean(user?.is_bot)} added=${effectiveAddedReactions
-            .map((r) => r.emoji)
+            .map((r) => r.display)
             .join(",")}`,
         );
       }
@@ -994,7 +1010,7 @@ export const registerTelegramHandlers = ({
       const sessionKey = route.sessionKey;
       reactionPipelineDiag?.(
         `${reactionDiagPrefix} stage=route session=${sessionKey ?? "default"} added=${effectiveAddedReactions
-          .map((r) => r.emoji)
+          .map((r) => r.display)
           .join(",")}`,
       );
 
@@ -1010,9 +1026,9 @@ export const registerTelegramHandlers = ({
 
       // Enqueue system event for each added reaction.
       for (const r of effectiveAddedReactions) {
-        const emoji = r.emoji;
-        const contextKey = `telegram:reaction:add:${chatId}:${messageId}:${user?.id ?? "anon"}:${emoji}`;
-        const text = `Telegram reaction added: ${emoji} by ${senderLabel} on msg ${messageId}`;
+        const reactionValue = r.display;
+        const contextKey = `telegram:reaction:add:${chatId}:${messageId}:${user?.id ?? "anon"}:${r.key}`;
+        const text = `Telegram reaction added: ${reactionValue} by ${senderLabel} on msg ${messageId}`;
         telegramDeps.enqueueSystemEvent(text, {
           sessionKey,
           contextKey,
@@ -1020,7 +1036,7 @@ export const registerTelegramHandlers = ({
         });
         logVerbose(`telegram: reaction event enqueued: ${text}`);
         reactionPipelineDiag?.(
-          `${reactionDiagPrefix} stage=enqueued session=${sessionKey ?? "default"} emoji=${emoji} context=${contextKey} delivery_to=${reactionDeliveryContext.to} delivery_thread=${reactionDeliveryContext.threadId ?? "none"}`,
+          `${reactionDiagPrefix} stage=enqueued session=${sessionKey ?? "default"} reaction=${reactionValue} context=${contextKey} delivery_to=${reactionDeliveryContext.to} delivery_thread=${reactionDeliveryContext.threadId ?? "none"}`,
         );
       }
 

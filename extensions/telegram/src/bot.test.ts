@@ -2470,6 +2470,41 @@ describe("createTelegramBot", () => {
     );
   });
 
+  it("falls back to latest custom emoji when Telegram sends a no-op custom reaction diff", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 5033 },
+      messageReaction: {
+        chat: { id: 1234, type: "private" },
+        message_id: 102,
+        user: { id: 9, first_name: "Ada" },
+        date: 1736380800,
+        old_reaction: [{ type: "custom_emoji", custom_emoji_id: "ce_1" }],
+        new_reaction: [{ type: "custom_emoji", custom_emoji_id: "ce_1" }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      "Telegram reaction added: custom_emoji:ce_1 by Ada on msg 102",
+      expect.any(Object),
+    );
+  });
+
   it("skips reaction in own mode when message is not sent by bot", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();
