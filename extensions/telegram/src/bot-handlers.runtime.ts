@@ -1289,10 +1289,16 @@ export const registerTelegramHandlers = ({
         new_reaction?: unknown;
         old_reactions?: unknown;
         new_reactions?: unknown;
+        before_reaction?: unknown;
+        after_reaction?: unknown;
+        before_reactions?: unknown;
+        after_reactions?: unknown;
         previous_reaction?: unknown;
         current_reaction?: unknown;
         previous_reactions?: unknown;
         current_reactions?: unknown;
+        before?: unknown;
+        after?: unknown;
         old?: unknown;
         new?: unknown;
         reaction?: unknown;
@@ -1301,6 +1307,10 @@ export const registerTelegramHandlers = ({
         newReaction?: unknown;
         oldReactions?: unknown;
         newReactions?: unknown;
+        beforeReaction?: unknown;
+        afterReaction?: unknown;
+        beforeReactions?: unknown;
+        afterReactions?: unknown;
         previousReaction?: unknown;
         currentReaction?: unknown;
         previousReactions?: unknown;
@@ -1312,10 +1322,16 @@ export const registerTelegramHandlers = ({
             new_reaction?: unknown;
             old_reactions?: unknown;
             new_reactions?: unknown;
+            before_reaction?: unknown;
+            after_reaction?: unknown;
+            before_reactions?: unknown;
+            after_reactions?: unknown;
             previous_reaction?: unknown;
             current_reaction?: unknown;
             previous_reactions?: unknown;
             current_reactions?: unknown;
+            before?: unknown;
+            after?: unknown;
             old?: unknown;
             new?: unknown;
             reaction?: unknown;
@@ -1324,6 +1340,10 @@ export const registerTelegramHandlers = ({
             newReaction?: unknown;
             oldReactions?: unknown;
             newReactions?: unknown;
+            beforeReaction?: unknown;
+            afterReaction?: unknown;
+            beforeReactions?: unknown;
+            afterReactions?: unknown;
             previousReaction?: unknown;
             currentReaction?: unknown;
             previousReactions?: unknown;
@@ -1428,44 +1448,64 @@ export const registerTelegramHandlers = ({
       const oldReactionValues = resolveReactionArray(
         reactionArrays.old_reaction,
         reactionArrays.old_reactions,
+        reactionArrays.before_reaction,
+        reactionArrays.before_reactions,
         reactionArrays.previous_reaction,
         reactionArrays.previous_reactions,
+        reactionArrays.before,
         reactionArrays.old,
         reactionArrays.oldReaction,
         reactionArrays.oldReactions,
+        reactionArrays.beforeReaction,
+        reactionArrays.beforeReactions,
         reactionArrays.previousReaction,
         reactionArrays.previousReactions,
         rawReactionArrays?.old_reaction,
         rawReactionArrays?.old_reactions,
+        rawReactionArrays?.before_reaction,
+        rawReactionArrays?.before_reactions,
         rawReactionArrays?.previous_reaction,
         rawReactionArrays?.previous_reactions,
+        rawReactionArrays?.before,
         rawReactionArrays?.old,
         rawReactionArrays?.oldReaction,
         rawReactionArrays?.oldReactions,
+        rawReactionArrays?.beforeReaction,
+        rawReactionArrays?.beforeReactions,
         rawReactionArrays?.previousReaction,
         rawReactionArrays?.previousReactions,
       );
       const newReactionValues = resolveReactionArray(
         reactionArrays.new_reaction,
         reactionArrays.new_reactions,
+        reactionArrays.after_reaction,
+        reactionArrays.after_reactions,
         reactionArrays.current_reaction,
         reactionArrays.current_reactions,
+        reactionArrays.after,
         reactionArrays.new,
         reactionArrays.reaction,
         reactionArrays.reactions,
         reactionArrays.newReaction,
         reactionArrays.newReactions,
+        reactionArrays.afterReaction,
+        reactionArrays.afterReactions,
         reactionArrays.currentReaction,
         reactionArrays.currentReactions,
         rawReactionArrays?.new_reaction,
         rawReactionArrays?.new_reactions,
+        rawReactionArrays?.after_reaction,
+        rawReactionArrays?.after_reactions,
         rawReactionArrays?.current_reaction,
         rawReactionArrays?.current_reactions,
+        rawReactionArrays?.after,
         rawReactionArrays?.new,
         rawReactionArrays?.reaction,
         rawReactionArrays?.reactions,
         rawReactionArrays?.newReaction,
         rawReactionArrays?.newReactions,
+        rawReactionArrays?.afterReaction,
+        rawReactionArrays?.afterReactions,
         rawReactionArrays?.currentReaction,
         rawReactionArrays?.currentReactions,
       );
