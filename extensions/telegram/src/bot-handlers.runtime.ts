@@ -952,12 +952,19 @@ export const registerTelegramHandlers = ({
           emoji?: string;
           custom_emoji_id?: string;
           customEmojiId?: string;
+          paid?: boolean;
+          is_paid?: boolean;
+          isPaid?: boolean;
         };
         const reactionType =
           typeof reactionValue.type === "string" && reactionValue.type.length > 0
             ? reactionValue.type
             : undefined;
-        if (reactionType === "paid") {
+        const isPaidReaction =
+          reactionValue.paid === true ||
+          reactionValue.is_paid === true ||
+          reactionValue.isPaid === true;
+        if (reactionType === "paid" || isPaidReaction) {
           return { key: "paid", display: "paid" };
         }
         const emojiValue =
