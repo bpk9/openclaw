@@ -1112,6 +1112,7 @@ export const registerTelegramHandlers = ({
           emoji?: string;
           custom_emoji_id?: string;
           customEmojiId?: string;
+          customEmoji?: string;
           paid?: boolean;
           is_paid?: boolean;
           isPaid?: boolean;
@@ -1138,7 +1139,8 @@ export const registerTelegramHandlers = ({
         if (normalizedReactionType === "emoji" && emojiValue) {
           return { key: `emoji:${emojiValue}`, display: emojiValue };
         }
-        const customEmojiId = reactionValue.custom_emoji_id ?? reactionValue.customEmojiId;
+        const customEmojiId =
+          reactionValue.custom_emoji_id ?? reactionValue.customEmojiId ?? reactionValue.customEmoji;
         if (
           normalizedReactionType === "customemoji" &&
           typeof customEmojiId === "string" &&
@@ -1500,6 +1502,7 @@ export const registerTelegramHandlers = ({
                 emoji?: string;
                 custom_emoji_id?: string;
                 customEmojiId?: string;
+                customEmoji?: string;
                 paid?: boolean;
                 is_paid?: boolean;
                 isPaid?: boolean;
@@ -1513,7 +1516,8 @@ export const registerTelegramHandlers = ({
             : typeof typedEntry.totalCount === "number"
               ? typedEntry.totalCount
               : 0;
-        const customEmojiId = typedEntry.custom_emoji_id ?? typedEntry.customEmojiId;
+        const customEmojiId =
+          typedEntry.custom_emoji_id ?? typedEntry.customEmojiId ?? typedEntry.customEmoji;
         const isPaidReaction =
           typedEntry.type === "paid" ||
           typedEntry.paid === true ||

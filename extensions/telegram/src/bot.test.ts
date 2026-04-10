@@ -2691,6 +2691,41 @@ describe("createTelegramBot", () => {
     );
   });
 
+  it("handles reaction payloads with customEmoji alias fields", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 50352 },
+      messageReaction: {
+        chat: { id: 1234, type: "private" },
+        message_id: 1042,
+        user: { id: 9, first_name: "Ada" },
+        date: 1736380800,
+        oldReaction: [],
+        newReaction: [{ customEmoji: "ce_alias" }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      "Telegram reaction added: custom_emoji:ce_alias by Ada on msg 1042",
+      expect.any(Object),
+    );
+  });
+
   it("uses raw update reaction arrays when parsed reaction omits them", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();
