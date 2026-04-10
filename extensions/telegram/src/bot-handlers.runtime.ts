@@ -957,6 +957,9 @@ export const registerTelegramHandlers = ({
           typeof reactionValue.type === "string" && reactionValue.type.length > 0
             ? reactionValue.type
             : undefined;
+        if (reactionType === "paid") {
+          return { key: "paid", display: "paid" };
+        }
         const emojiValue =
           typeof reactionValue.emoji === "string" && reactionValue.emoji.length > 0
             ? reactionValue.emoji

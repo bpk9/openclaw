@@ -2775,6 +2775,41 @@ describe("createTelegramBot", () => {
     );
   });
 
+  it("falls back to paid reactions when Telegram sends a no-op paid diff", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 5040 },
+      messageReaction: {
+        chat: { id: 1234, type: "private" },
+        message_id: 109,
+        user: { id: 9, first_name: "Ada" },
+        date: 1736380800,
+        old_reaction: [{ type: "paid" }],
+        new_reaction: [{ type: "paid" }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      "Telegram reaction added: paid by Ada on msg 109",
+      expect.any(Object),
+    );
+  });
+
   it("skips reaction in own mode when message is not sent by bot", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();
