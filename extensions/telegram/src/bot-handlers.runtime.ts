@@ -998,21 +998,26 @@ export const registerTelegramHandlers = ({
             newReaction?: unknown;
           }
         | undefined;
-      const firstReactionArray = (...values: unknown[]): unknown[] => {
+      const resolveReactionArray = (...values: unknown[]): unknown[] => {
+        let firstArray: unknown[] | null = null;
         for (const value of values) {
-          if (Array.isArray(value)) {
+          if (!Array.isArray(value)) {
+            continue;
+          }
+          firstArray ??= value;
+          if (value.length > 0) {
             return value;
           }
         }
-        return [];
+        return firstArray ?? [];
       };
-      const oldReactionValues = firstReactionArray(
+      const oldReactionValues = resolveReactionArray(
         reactionArrays.old_reaction,
         reactionArrays.oldReaction,
         rawReactionArrays?.old_reaction,
         rawReactionArrays?.oldReaction,
       );
-      const newReactionValues = firstReactionArray(
+      const newReactionValues = resolveReactionArray(
         reactionArrays.new_reaction,
         reactionArrays.newReaction,
         rawReactionArrays?.new_reaction,
