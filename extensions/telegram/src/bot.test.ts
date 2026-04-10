@@ -2158,6 +2158,49 @@ describe("createTelegramBot", () => {
     );
   });
 
+  it("enqueues reaction_count fallback from camelCase raw envelope", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction_count") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: {
+        update_id: 500,
+        messageReactionCount: {
+          chat: { id: 4321, type: "private" },
+          messageId: 55,
+          reaction: [{ customEmojiId: "ce_123", totalCount: 2 }],
+        },
+      },
+      messageReactionCount: {
+        reaction: [],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      "Telegram reaction count changed on msg 55: custom:ce_123:2",
+      expect.objectContaining({
+        contextKey: expect.stringContaining("telegram:reaction:count:4321:55:custom:ce_123:2"),
+        deliveryContext: {
+          channel: "telegram",
+          to: "telegram:4321",
+          accountId: expect.any(String),
+        },
+      }),
+    );
+  });
+
   it("enqueues system event for reaction", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();

@@ -1197,7 +1197,12 @@ export const registerTelegramHandlers = ({
   // without per-user message_reaction payloads.
   bot.on("message_reaction_count", async (ctx) => {
     try {
-      const reactionCount = ctx.messageReactionCount ?? ctx.update?.message_reaction_count;
+      const rawReactionCount =
+        ctx.update?.message_reaction_count ??
+        ((ctx.update as { messageReactionCount?: unknown } | undefined)?.messageReactionCount as
+          | Record<string, unknown>
+          | undefined);
+      const reactionCount = ctx.messageReactionCount ?? rawReactionCount;
       if (!reactionCount) {
         return;
       }
@@ -1205,11 +1210,40 @@ export const registerTelegramHandlers = ({
         return;
       }
 
-      const chatId = reactionCount.chat.id;
-      const messageId = reactionCount.message_id;
-      const isGroup =
-        reactionCount.chat.type === "group" || reactionCount.chat.type === "supergroup";
-      const isForum = reactionCount.chat.is_forum === true;
+      const reactionCountEnvelope = reactionCount as {
+        chat?: { id?: number; type?: string; is_forum?: boolean; title?: string };
+        message_id?: number;
+        messageId?: number;
+        reactions?: unknown;
+        reaction?: unknown;
+      };
+      const rawReactionCountEnvelope = rawReactionCount as
+        | {
+            chat?: { id?: number; type?: string; is_forum?: boolean; title?: string };
+            message_id?: number;
+            messageId?: number;
+            reactions?: unknown;
+            reaction?: unknown;
+          }
+        | undefined;
+      const reactionChat = reactionCountEnvelope.chat ?? rawReactionCountEnvelope?.chat;
+      const chatId = reactionChat?.id;
+      const messageId =
+        reactionCountEnvelope.message_id ??
+        reactionCountEnvelope.messageId ??
+        rawReactionCountEnvelope?.message_id ??
+        rawReactionCountEnvelope?.messageId;
+      if (!reactionChat || chatId == null || messageId == null) {
+        reactionPipelineDiag?.(
+          `[telegram-reaction-count-diag] account=${accountId} stage=drop reason=missing-reaction-envelope hasChat=${Boolean(
+            reactionChat,
+          )} hasChatId=${chatId != null} hasMessageId=${messageId != null}`,
+        );
+        return;
+      }
+
+      const isGroup = reactionChat.type === "group" || reactionChat.type === "supergroup";
+      const isForum = reactionChat.is_forum === true;
       const reactionDiagPrefix = `[telegram-reaction-count-diag] account=${accountId} chat=${chatId} msg=${messageId}`;
 
       const reactionMode = telegramCfg.reactionNotifications ?? "own";
@@ -1247,15 +1281,65 @@ export const registerTelegramHandlers = ({
         return;
       }
 
-      const summaryParts = (reactionCount.reactions ?? []).map((entry) => {
-        const count = typeof entry.total_count === "number" ? entry.total_count : 0;
-        if (entry.type === "emoji") {
-          return `${entry.emoji}:${count}`;
+      const resolveReactionEntries = (...values: unknown[]): unknown[] => {
+        let firstArray: unknown[] | null = null;
+        for (const value of values) {
+          if (!Array.isArray(value)) {
+            continue;
+          }
+          firstArray ??= value;
+          if (value.length > 0) {
+            return value;
+          }
         }
-        if (entry.type === "custom_emoji") {
-          return `custom:${entry.custom_emoji_id}:${count}`;
+        return firstArray ?? [];
+      };
+      const reactionEntries = resolveReactionEntries(
+        reactionCountEnvelope.reactions,
+        reactionCountEnvelope.reaction,
+        rawReactionCountEnvelope?.reactions,
+        rawReactionCountEnvelope?.reaction,
+      );
+      const summaryParts = reactionEntries.map((entry) => {
+        const typedEntry =
+          entry && typeof entry === "object"
+            ? (entry as {
+                type?: string;
+                emoji?: string;
+                custom_emoji_id?: string;
+                customEmojiId?: string;
+                paid?: boolean;
+                is_paid?: boolean;
+                isPaid?: boolean;
+                total_count?: number;
+                totalCount?: number;
+              })
+            : {};
+        const count =
+          typeof typedEntry.total_count === "number"
+            ? typedEntry.total_count
+            : typeof typedEntry.totalCount === "number"
+              ? typedEntry.totalCount
+              : 0;
+        const customEmojiId = typedEntry.custom_emoji_id ?? typedEntry.customEmojiId;
+        const isPaidReaction =
+          typedEntry.type === "paid" ||
+          typedEntry.paid === true ||
+          typedEntry.is_paid === true ||
+          typedEntry.isPaid === true;
+        if (typedEntry.type === "emoji" || (!typedEntry.type && typedEntry.emoji)) {
+          return `${typedEntry.emoji ?? "emoji"}:${count}`;
         }
-        return `${entry.type}:${count}`;
+        if (
+          typedEntry.type === "custom_emoji" ||
+          (!typedEntry.type && typeof customEmojiId === "string")
+        ) {
+          return `custom:${customEmojiId ?? "unknown"}:${count}`;
+        }
+        if (isPaidReaction) {
+          return `paid:${count}`;
+        }
+        return `${typedEntry.type ?? "unknown"}:${count}`;
       });
       const summary = summaryParts.length > 0 ? summaryParts.join(",") : "none";
 
