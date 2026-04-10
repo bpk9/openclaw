@@ -998,23 +998,27 @@ export const registerTelegramHandlers = ({
           typeof reactionValue.type === "string" && reactionValue.type.length > 0
             ? reactionValue.type
             : undefined;
+        const normalizedReactionType = reactionType
+          ?.toLowerCase()
+          .replace(/[_-]/g, "");
         const isPaidReaction =
+          normalizedReactionType === "paid" ||
           reactionValue.paid === true ||
           reactionValue.is_paid === true ||
           reactionValue.isPaid === true;
-        if (reactionType === "paid" || isPaidReaction) {
+        if (isPaidReaction) {
           return { key: "paid", display: "paid" };
         }
         const emojiValue =
           typeof reactionValue.emoji === "string" && reactionValue.emoji.length > 0
             ? reactionValue.emoji
             : undefined;
-        if (reactionType === "emoji" && emojiValue) {
+        if (normalizedReactionType === "emoji" && emojiValue) {
           return { key: `emoji:${emojiValue}`, display: emojiValue };
         }
         const customEmojiId = reactionValue.custom_emoji_id ?? reactionValue.customEmojiId;
         if (
-          reactionType === "custom_emoji" &&
+          normalizedReactionType === "customemoji" &&
           typeof customEmojiId === "string" &&
           customEmojiId.length > 0
         ) {
