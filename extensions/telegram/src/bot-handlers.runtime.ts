@@ -787,8 +787,16 @@ export const registerTelegramHandlers = ({
   const reactionPipelineDiag = reactionDiagEnabled ? (runtime.error ?? runtime.info) : undefined;
   bot.use(async (ctx, next) => {
     const middlewareDiagAll = process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_POLL === "1";
-    const rawReaction = ctx.update?.message_reaction;
-    const rawReactionCount = ctx.update?.message_reaction_count;
+    const rawReaction =
+      ctx.update?.message_reaction ??
+      ((ctx.update as { messageReaction?: unknown } | undefined)?.messageReaction as
+        | Record<string, unknown>
+        | undefined);
+    const rawReactionCount =
+      ctx.update?.message_reaction_count ??
+      ((ctx.update as { messageReactionCount?: unknown } | undefined)?.messageReactionCount as
+        | Record<string, unknown>
+        | undefined);
     const parsedReaction = ctx.messageReaction;
     const parsedReactionCount = ctx.messageReactionCount;
     const shouldEmitMiddlewareDiag =
@@ -833,7 +841,11 @@ export const registerTelegramHandlers = ({
   bot.on("message_reaction", async (ctx) => {
     try {
       const parsedReaction = ctx.messageReaction;
-      const rawReaction = ctx.update?.message_reaction;
+      const rawReaction =
+        ctx.update?.message_reaction ??
+        ((ctx.update as { messageReaction?: unknown } | undefined)?.messageReaction as
+          | Record<string, unknown>
+          | undefined);
       const reaction = parsedReaction ?? rawReaction;
       if (!reaction) {
         return;
