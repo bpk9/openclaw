@@ -851,15 +851,53 @@ export const registerTelegramHandlers = ({
         return;
       }
 
+      const reactionEnvelope = reaction as {
+        chat?: { id?: number; type?: string; is_forum?: boolean; title?: string };
+        message_id?: number;
+        messageId?: number;
+        user?: {
+          id?: number;
+          username?: string;
+          is_bot?: boolean;
+          first_name?: string;
+          last_name?: string;
+        };
+      };
+      const rawReactionEnvelope = rawReaction as
+        | {
+            chat?: { id?: number; type?: string; is_forum?: boolean; title?: string };
+            message_id?: number;
+            messageId?: number;
+            user?: {
+              id?: number;
+              username?: string;
+              is_bot?: boolean;
+              first_name?: string;
+              last_name?: string;
+            };
+          }
+        | undefined;
+      const reactionChat = reactionEnvelope.chat ?? rawReactionEnvelope?.chat;
+      const messageId =
+        reactionEnvelope.message_id ??
+        reactionEnvelope.messageId ??
+        rawReactionEnvelope?.message_id ??
+        rawReactionEnvelope?.messageId;
+      const user = reactionEnvelope.user ?? rawReactionEnvelope?.user;
+      const chatId = reactionChat?.id;
+      if (!reactionChat || chatId == null || messageId == null) {
+        reactionPipelineDiag?.(
+          `[telegram-reaction-diag] account=${accountId} stage=drop reason=missing-reaction-envelope hasChat=${Boolean(reactionChat)} hasChatId=${chatId != null} hasMessageId=${messageId != null}`,
+        );
+        return;
+      }
+
       const typedUpdate = (ctx.update ?? {}) as Record<string, unknown>;
       const updateId = typeof typedUpdate.update_id === "number" ? String(typedUpdate.update_id) : "n/a";
-      const chatId = reaction.chat.id;
-      const messageId = reaction.message_id;
-      const user = reaction.user;
       const senderId = user?.id != null ? String(user.id) : "";
       const senderUsername = user?.username ?? "";
-      const isGroup = reaction.chat.type === "group" || reaction.chat.type === "supergroup";
-      const isForum = reaction.chat.is_forum === true;
+      const isGroup = reactionChat.type === "group" || reactionChat.type === "supergroup";
+      const isForum = reactionChat.is_forum === true;
       const reactionDiagPrefix = `[telegram-reaction-diag] account=${accountId} update_id=${updateId} chat=${chatId} msg=${messageId} sender=${senderId || "anon"}`;
 
       const skippedByUpdateGate = shouldSkipUpdate(ctx);
@@ -905,7 +943,7 @@ export const registerTelegramHandlers = ({
         ? { allowed: true }
         : authorizeTelegramEventSender({
             chatId,
-            chatTitle: reaction.chat.title,
+            chatTitle: reactionChat.title,
             isGroup,
             senderId,
             senderUsername,

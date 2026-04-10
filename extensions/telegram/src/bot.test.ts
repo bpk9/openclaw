@@ -2617,6 +2617,48 @@ describe("createTelegramBot", () => {
     );
   });
 
+  it("uses raw update envelope fields when parsed reaction omits chat/message/user", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: {
+        update_id: 50362,
+        message_reaction: {
+          chat: { id: 1234, type: "private" },
+          message_id: 1052,
+          user: { id: 9, first_name: "Ada" },
+          date: 1736380800,
+          old_reaction: [],
+          new_reaction: [{ type: "emoji", emoji: FIRE_EMOJI }],
+        },
+      },
+      messageReaction: {
+        date: 1736380800,
+        old_reaction: [],
+        new_reaction: [{ type: "emoji", emoji: FIRE_EMOJI }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      `Telegram reaction added: ${FIRE_EMOJI} by Ada on msg 1052`,
+      expect.any(Object),
+    );
+  });
+
   it("uses non-empty raw update reaction arrays when parsed reaction arrays are empty", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();
