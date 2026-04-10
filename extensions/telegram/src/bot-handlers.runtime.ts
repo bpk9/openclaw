@@ -1244,6 +1244,7 @@ export const registerTelegramHandlers = ({
           .replace(/[_-]/g, "");
         const isPaidReaction =
           normalizedReactionType === "paid" ||
+          normalizedReactionType === "paidreaction" ||
           reactionValue.paid === true ||
           reactionValue.is_paid === true ||
           reactionValue.isPaid === true;
