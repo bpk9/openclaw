@@ -1189,6 +1189,42 @@ export const registerTelegramHandlers = ({
           }
           return undefined;
         };
+        const normalizeEmojiValue = (candidate: unknown): string | undefined => {
+          if (typeof candidate === "string") {
+            const trimmed = candidate.trim();
+            return trimmed.length > 0 ? trimmed : undefined;
+          }
+          if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+            const emojiCandidate = candidate as {
+              emoji?: unknown;
+              emoticon?: unknown;
+              unicode_emoji?: unknown;
+              unicodeEmoji?: unknown;
+              value?: unknown;
+              text?: unknown;
+              symbol?: unknown;
+            };
+            const nestedCandidates = [
+              emojiCandidate.emoji,
+              emojiCandidate.emoticon,
+              emojiCandidate.unicode_emoji,
+              emojiCandidate.unicodeEmoji,
+              emojiCandidate.value,
+              emojiCandidate.text,
+              emojiCandidate.symbol,
+            ];
+            for (const nestedCandidate of nestedCandidates) {
+              if (nestedCandidate === candidate) {
+                continue;
+              }
+              const normalizedNested = normalizeEmojiValue(nestedCandidate);
+              if (normalizedNested) {
+                return normalizedNested;
+              }
+            }
+          }
+          return undefined;
+        };
         const reactionType =
           typeof reactionValue.type === "string" && reactionValue.type.length > 0
             ? reactionValue.type
@@ -1204,18 +1240,12 @@ export const registerTelegramHandlers = ({
         if (isPaidReaction) {
           return { key: "paid", display: "paid" };
         }
-        const emojiValue =
-          typeof reactionValue.emoji === "string" && reactionValue.emoji.length > 0
-            ? reactionValue.emoji
-            : typeof reactionValue.emoticon === "string" && reactionValue.emoticon.length > 0
-              ? reactionValue.emoticon
-              : typeof reactionValue.unicode_emoji === "string" &&
-                  reactionValue.unicode_emoji.length > 0
-                ? reactionValue.unicode_emoji
-                : typeof reactionValue.unicodeEmoji === "string" &&
-                    reactionValue.unicodeEmoji.length > 0
-                  ? reactionValue.unicodeEmoji
-                  : undefined;
+        const emojiValue = normalizeEmojiValue(
+          reactionValue.emoji ??
+            reactionValue.emoticon ??
+            reactionValue.unicode_emoji ??
+            reactionValue.unicodeEmoji,
+        );
         if (normalizedReactionType === "emoji" && emojiValue) {
           return { key: `emoji:${emojiValue}`, display: emojiValue };
         }
