@@ -2726,6 +2726,41 @@ describe("createTelegramBot", () => {
     );
   });
 
+  it("handles reaction payloads with numeric custom emoji identifiers", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 50353 },
+      messageReaction: {
+        chat: { id: 1234, type: "private" },
+        message_id: 1043,
+        user: { id: 9, first_name: "Ada" },
+        date: 1736380800,
+        old_reaction: [],
+        new_reaction: [{ type: "custom_emoji", custom_emoji_id: 987654321 }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      "Telegram reaction added: custom_emoji:987654321 by Ada on msg 1043",
+      expect.any(Object),
+    );
+  });
+
   it("uses raw update reaction arrays when parsed reaction omits them", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();

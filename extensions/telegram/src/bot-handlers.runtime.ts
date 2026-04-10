@@ -1132,12 +1132,25 @@ export const registerTelegramHandlers = ({
         const reactionValue = value as {
           type?: string;
           emoji?: string;
-          custom_emoji_id?: string;
-          customEmojiId?: string;
-          customEmoji?: string;
+          custom_emoji_id?: unknown;
+          customEmojiId?: unknown;
+          customEmoji?: unknown;
           paid?: boolean;
           is_paid?: boolean;
           isPaid?: boolean;
+        };
+        const normalizeId = (candidate: unknown): string | undefined => {
+          if (typeof candidate === "string") {
+            const trimmed = candidate.trim();
+            return trimmed.length > 0 ? trimmed : undefined;
+          }
+          if (typeof candidate === "number" && Number.isFinite(candidate)) {
+            return String(candidate);
+          }
+          if (typeof candidate === "bigint") {
+            return candidate.toString();
+          }
+          return undefined;
         };
         const reactionType =
           typeof reactionValue.type === "string" && reactionValue.type.length > 0
@@ -1161,13 +1174,10 @@ export const registerTelegramHandlers = ({
         if (normalizedReactionType === "emoji" && emojiValue) {
           return { key: `emoji:${emojiValue}`, display: emojiValue };
         }
-        const customEmojiId =
-          reactionValue.custom_emoji_id ?? reactionValue.customEmojiId ?? reactionValue.customEmoji;
-        if (
-          normalizedReactionType === "customemoji" &&
-          typeof customEmojiId === "string" &&
-          customEmojiId.length > 0
-        ) {
+        const customEmojiId = normalizeId(
+          reactionValue.custom_emoji_id ?? reactionValue.customEmojiId ?? reactionValue.customEmoji,
+        );
+        if (normalizedReactionType === "customemoji" && customEmojiId) {
           return {
             key: `custom_emoji:${customEmojiId}`,
             display: `custom_emoji:${customEmojiId}`,
@@ -1177,7 +1187,7 @@ export const registerTelegramHandlers = ({
         if (emojiValue) {
           return { key: `emoji:${emojiValue}`, display: emojiValue };
         }
-        if (typeof customEmojiId === "string" && customEmojiId.length > 0) {
+        if (customEmojiId) {
           return {
             key: `custom_emoji:${customEmojiId}`,
             display: `custom_emoji:${customEmojiId}`,
@@ -1567,9 +1577,9 @@ export const registerTelegramHandlers = ({
             ? (entry as {
                 type?: string;
                 emoji?: string;
-                custom_emoji_id?: string;
-                customEmojiId?: string;
-                customEmoji?: string;
+                custom_emoji_id?: unknown;
+                customEmojiId?: unknown;
+                customEmoji?: unknown;
                 paid?: boolean;
                 is_paid?: boolean;
                 isPaid?: boolean;
@@ -1583,8 +1593,16 @@ export const registerTelegramHandlers = ({
             : typeof typedEntry.totalCount === "number"
               ? typedEntry.totalCount
               : 0;
-        const customEmojiId =
+        const customEmojiRaw =
           typedEntry.custom_emoji_id ?? typedEntry.customEmojiId ?? typedEntry.customEmoji;
+        const customEmojiId =
+          typeof customEmojiRaw === "string"
+            ? customEmojiRaw
+            : typeof customEmojiRaw === "number" && Number.isFinite(customEmojiRaw)
+              ? String(customEmojiRaw)
+              : typeof customEmojiRaw === "bigint"
+                ? customEmojiRaw.toString()
+                : undefined;
         const isPaidReaction =
           typedEntry.type === "paid" ||
           typedEntry.paid === true ||
