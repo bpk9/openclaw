@@ -924,26 +924,50 @@ export const registerTelegramHandlers = ({
       }
 
       // Detect added reactions (emoji + custom emoji).
-      const normalizeReaction = (
-        value: (typeof reaction.new_reaction)[number],
-      ): { key: string; display: string } | null => {
-        if (value.type === "emoji") {
-          return { key: `emoji:${value.emoji}`, display: value.emoji };
+      // Telegram updates are snake_case, but adapter paths may expose camelCase
+      // reaction arrays. Normalize both shapes to avoid silent no-op drops.
+      const normalizeReaction = (value: unknown): { key: string; display: string } | null => {
+        if (!value || typeof value !== "object") {
+          return null;
         }
+        const reactionValue = value as {
+          type?: string;
+          emoji?: string;
+          custom_emoji_id?: string;
+          customEmojiId?: string;
+        };
+        if (reactionValue.type === "emoji" && typeof reactionValue.emoji === "string") {
+          return { key: `emoji:${reactionValue.emoji}`, display: reactionValue.emoji };
+        }
+        const customEmojiId = reactionValue.custom_emoji_id ?? reactionValue.customEmojiId;
         if (
-          value.type === "custom_emoji" &&
-          typeof value.custom_emoji_id === "string" &&
-          value.custom_emoji_id.length > 0
+          reactionValue.type === "custom_emoji" &&
+          typeof customEmojiId === "string" &&
+          customEmojiId.length > 0
         ) {
           return {
-            key: `custom_emoji:${value.custom_emoji_id}`,
-            display: `custom_emoji:${value.custom_emoji_id}`,
+            key: `custom_emoji:${customEmojiId}`,
+            display: `custom_emoji:${customEmojiId}`,
           };
         }
         return null;
       };
-      const oldReactionValues = Array.isArray(reaction.old_reaction) ? reaction.old_reaction : [];
-      const newReactionValues = Array.isArray(reaction.new_reaction) ? reaction.new_reaction : [];
+      const reactionArrays = reaction as {
+        old_reaction?: unknown;
+        new_reaction?: unknown;
+        oldReaction?: unknown;
+        newReaction?: unknown;
+      };
+      const oldReactionValues = Array.isArray(reactionArrays.old_reaction)
+        ? reactionArrays.old_reaction
+        : Array.isArray(reactionArrays.oldReaction)
+          ? reactionArrays.oldReaction
+          : [];
+      const newReactionValues = Array.isArray(reactionArrays.new_reaction)
+        ? reactionArrays.new_reaction
+        : Array.isArray(reactionArrays.newReaction)
+          ? reactionArrays.newReaction
+          : [];
       const oldReactionKeys = new Set(
         oldReactionValues.map(normalizeReaction).flatMap((r) => (r ? [r.key] : [])),
       );

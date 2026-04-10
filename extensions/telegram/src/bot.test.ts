@@ -2539,6 +2539,41 @@ describe("createTelegramBot", () => {
     );
   });
 
+  it("handles reaction payloads with camelCase reaction arrays", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 5035 },
+      messageReaction: {
+        chat: { id: 1234, type: "private" },
+        message_id: 104,
+        user: { id: 9, first_name: "Ada" },
+        date: 1736380800,
+        oldReaction: [],
+        newReaction: [{ type: "emoji", emoji: FIRE_EMOJI }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      `Telegram reaction added: ${FIRE_EMOJI} by Ada on msg 104`,
+      expect.any(Object),
+    );
+  });
+
   it("skips reaction in own mode when message is not sent by bot", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();
