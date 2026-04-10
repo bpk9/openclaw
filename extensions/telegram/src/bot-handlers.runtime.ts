@@ -1815,6 +1815,42 @@ export const registerTelegramHandlers = ({
         }
         return undefined;
       };
+      const normalizeReactionCountEmoji = (candidate: unknown): string | undefined => {
+        if (typeof candidate === "string") {
+          const trimmed = candidate.trim();
+          return trimmed.length > 0 ? trimmed : undefined;
+        }
+        if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+          const objectCandidate = candidate as {
+            emoji?: unknown;
+            emoticon?: unknown;
+            unicode_emoji?: unknown;
+            unicodeEmoji?: unknown;
+            value?: unknown;
+            text?: unknown;
+            symbol?: unknown;
+          };
+          const nestedCandidates = [
+            objectCandidate.emoji,
+            objectCandidate.emoticon,
+            objectCandidate.unicode_emoji,
+            objectCandidate.unicodeEmoji,
+            objectCandidate.value,
+            objectCandidate.text,
+            objectCandidate.symbol,
+          ];
+          for (const nestedCandidate of nestedCandidates) {
+            if (nestedCandidate === candidate) {
+              continue;
+            }
+            const normalizedNested = normalizeReactionCountEmoji(nestedCandidate);
+            if (normalizedNested) {
+              return normalizedNested;
+            }
+          }
+        }
+        return undefined;
+      };
       const unwrapReactionCountEntry = (entry: unknown): Record<string, unknown> => {
         if (!entry || typeof entry !== "object") {
           return {};
@@ -1853,16 +1889,12 @@ export const registerTelegramHandlers = ({
         };
         const count = parseReactionCount(typedEntry.total_count ?? typedEntry.totalCount);
         const normalizedType = normalizeReactionTypeLabel(typedEntry.type);
-        const emoji =
-          typeof typedEntry.emoji === "string" && typedEntry.emoji.length > 0
-            ? typedEntry.emoji
-            : typeof typedEntry.emoticon === "string" && typedEntry.emoticon.length > 0
-              ? typedEntry.emoticon
-              : typeof typedEntry.unicode_emoji === "string" && typedEntry.unicode_emoji.length > 0
-                ? typedEntry.unicode_emoji
-                : typeof typedEntry.unicodeEmoji === "string" && typedEntry.unicodeEmoji.length > 0
-                  ? typedEntry.unicodeEmoji
-                  : undefined;
+        const emoji = normalizeReactionCountEmoji(
+          typedEntry.emoji ??
+            typedEntry.emoticon ??
+            typedEntry.unicode_emoji ??
+            typedEntry.unicodeEmoji,
+        );
         const customEmojiRaw =
           typedEntry.custom_emoji_id ??
           typedEntry.custom_emoji ??
