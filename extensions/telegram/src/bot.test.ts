@@ -2726,6 +2726,41 @@ describe("createTelegramBot", () => {
     );
   });
 
+  it("handles reaction payloads with custom_emoji alias fields", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 503521 },
+      messageReaction: {
+        chat: { id: 1234, type: "private" },
+        message_id: 10421,
+        user: { id: 9, first_name: "Ada" },
+        date: 1736380800,
+        oldReaction: [],
+        newReaction: [{ custom_emoji: "ce_alias_snake" }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      "Telegram reaction added: custom_emoji:ce_alias_snake by Ada on msg 10421",
+      expect.any(Object),
+    );
+  });
+
   it("handles reaction payloads with numeric custom emoji identifiers", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();

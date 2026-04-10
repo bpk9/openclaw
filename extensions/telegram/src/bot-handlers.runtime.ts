@@ -1133,6 +1133,7 @@ export const registerTelegramHandlers = ({
           type?: string;
           emoji?: string;
           custom_emoji_id?: unknown;
+          custom_emoji?: unknown;
           customEmojiId?: unknown;
           customEmoji?: unknown;
           paid?: boolean;
@@ -1175,7 +1176,10 @@ export const registerTelegramHandlers = ({
           return { key: `emoji:${emojiValue}`, display: emojiValue };
         }
         const customEmojiId = normalizeId(
-          reactionValue.custom_emoji_id ?? reactionValue.customEmojiId ?? reactionValue.customEmoji,
+          reactionValue.custom_emoji_id ??
+            reactionValue.custom_emoji ??
+            reactionValue.customEmojiId ??
+            reactionValue.customEmoji,
         );
         if (normalizedReactionType === "customemoji" && customEmojiId) {
           return {
@@ -1578,6 +1582,7 @@ export const registerTelegramHandlers = ({
                 type?: string;
                 emoji?: string;
                 custom_emoji_id?: unknown;
+                custom_emoji?: unknown;
                 customEmojiId?: unknown;
                 customEmoji?: unknown;
                 paid?: boolean;
@@ -1594,7 +1599,10 @@ export const registerTelegramHandlers = ({
               ? typedEntry.totalCount
               : 0;
         const customEmojiRaw =
-          typedEntry.custom_emoji_id ?? typedEntry.customEmojiId ?? typedEntry.customEmoji;
+          typedEntry.custom_emoji_id ??
+          typedEntry.custom_emoji ??
+          typedEntry.customEmojiId ??
+          typedEntry.customEmoji;
         const customEmojiId =
           typeof customEmojiRaw === "string"
             ? customEmojiRaw
