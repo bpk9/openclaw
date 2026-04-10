@@ -941,6 +941,9 @@ export const registerTelegramHandlers = ({
       // Telegram updates are snake_case, but adapter paths may expose camelCase
       // reaction arrays. Normalize both shapes to avoid silent no-op drops.
       const normalizeReaction = (value: unknown): { key: string; display: string } | null => {
+        if (typeof value === "string" && value.length > 0) {
+          return { key: `emoji:${value}`, display: value };
+        }
         if (!value || typeof value !== "object") {
           return null;
         }
