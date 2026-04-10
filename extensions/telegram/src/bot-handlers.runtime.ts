@@ -1583,18 +1583,71 @@ export const registerTelegramHandlers = ({
         return;
       }
 
+      const parseReactionEntriesJson = (value: string): unknown | null => {
+        const trimmed = value.trim();
+        if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) {
+          return null;
+        }
+        try {
+          return JSON.parse(trimmed) as unknown;
+        } catch {
+          return null;
+        }
+      };
+      const coerceReactionEntriesCandidate = (value: unknown): unknown[] | null => {
+        const coerceIndexedObjectArray = (candidate: unknown): unknown[] | null => {
+          if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+            return null;
+          }
+          const indexedEntries = Object.entries(candidate as Record<string, unknown>)
+            .filter(([key]) => /^\d+$/.test(key))
+            .sort((a, b) => Number(a[0]) - Number(b[0]));
+          if (indexedEntries.length === 0) {
+            return null;
+          }
+          return indexedEntries.map(([, entry]) => entry);
+        };
+        if (Array.isArray(value)) {
+          return value;
+        }
+        if (typeof value === "string") {
+          const parsed = parseReactionEntriesJson(value);
+          if (Array.isArray(parsed)) {
+            return parsed;
+          }
+          const parsedIndexed = coerceIndexedObjectArray(parsed);
+          if (parsedIndexed) {
+            return parsedIndexed;
+          }
+          if (parsed && typeof parsed === "object") {
+            return [parsed];
+          }
+          return null;
+        }
+        const indexed = coerceIndexedObjectArray(value);
+        if (indexed) {
+          return indexed;
+        }
+        if (value && typeof value === "object") {
+          return [value];
+        }
+        return null;
+      };
       const resolveReactionEntries = (...values: unknown[]): unknown[] => {
         let firstArray: unknown[] | null = null;
+        let firstNonEmptyArray: unknown[] | null = null;
         for (const value of values) {
-          if (!Array.isArray(value)) {
+          const candidate = coerceReactionEntriesCandidate(value);
+          if (!candidate) {
             continue;
           }
-          firstArray ??= value;
-          if (value.length > 0) {
-            return value;
+          firstArray ??= candidate;
+          if (candidate.length > 0) {
+            firstNonEmptyArray ??= candidate;
+            return candidate;
           }
         }
-        return firstArray ?? [];
+        return firstNonEmptyArray ?? firstArray ?? [];
       };
       const reactionEntries = resolveReactionEntries(
         reactionCountEnvelope.reactions,
