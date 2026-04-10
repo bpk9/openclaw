@@ -1051,16 +1051,20 @@ export const registerTelegramHandlers = ({
         | undefined;
       const resolveReactionArray = (...values: unknown[]): unknown[] => {
         let firstArray: unknown[] | null = null;
+        let firstNonEmptyArray: unknown[] | null = null;
         for (const value of values) {
           if (!Array.isArray(value)) {
             continue;
           }
           firstArray ??= value;
           if (value.length > 0) {
-            return value;
+            firstNonEmptyArray ??= value;
+            if (value.some((item) => normalizeReaction(item) !== null)) {
+              return value;
+            }
           }
         }
-        return firstArray ?? [];
+        return firstNonEmptyArray ?? firstArray ?? [];
       };
       const oldReactionValues = resolveReactionArray(
         reactionArrays.old_reaction,
