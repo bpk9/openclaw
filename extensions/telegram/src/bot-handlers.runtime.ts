@@ -1200,6 +1200,18 @@ export const registerTelegramHandlers = ({
           }
         | undefined;
       const coerceReactionArrayCandidate = (value: unknown): unknown[] | null => {
+        const coerceIndexedObjectArray = (candidate: unknown): unknown[] | null => {
+          if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+            return null;
+          }
+          const indexedEntries = Object.entries(candidate as Record<string, unknown>)
+            .filter(([key]) => /^\d+$/.test(key))
+            .sort((a, b) => Number(a[0]) - Number(b[0]));
+          if (indexedEntries.length === 0) {
+            return null;
+          }
+          return indexedEntries.map(([, entry]) => entry);
+        };
         if (Array.isArray(value)) {
           return value;
         }
@@ -1208,9 +1220,17 @@ export const registerTelegramHandlers = ({
           if (Array.isArray(parsed)) {
             return parsed;
           }
+          const parsedIndexedArray = coerceIndexedObjectArray(parsed);
+          if (parsedIndexedArray) {
+            return parsedIndexedArray;
+          }
           if (parsed !== null && normalizeReaction(parsed) !== null) {
             return [parsed];
           }
+        }
+        const indexedArray = coerceIndexedObjectArray(value);
+        if (indexedArray) {
+          return indexedArray;
         }
         if (normalizeReaction(value) !== null) {
           return [value];
