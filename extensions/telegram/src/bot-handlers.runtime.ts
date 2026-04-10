@@ -985,6 +985,27 @@ export const registerTelegramHandlers = ({
         if (!value || typeof value !== "object") {
           return null;
         }
+        const wrappedReaction = (value as {
+          reaction?: unknown;
+          reaction_type?: unknown;
+          reactionType?: unknown;
+        }).reaction ??
+          (value as {
+            reaction?: unknown;
+            reaction_type?: unknown;
+            reactionType?: unknown;
+          }).reaction_type ??
+          (value as {
+            reaction?: unknown;
+            reaction_type?: unknown;
+            reactionType?: unknown;
+          }).reactionType;
+        if (wrappedReaction && wrappedReaction !== value) {
+          const normalizedWrapped = normalizeReaction(wrappedReaction);
+          if (normalizedWrapped) {
+            return normalizedWrapped;
+          }
+        }
         const reactionValue = value as {
           type?: string;
           emoji?: string;
