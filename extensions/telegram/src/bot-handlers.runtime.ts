@@ -1602,12 +1602,39 @@ export const registerTelegramHandlers = ({
         rawReactionCountEnvelope?.reactions,
         rawReactionCountEnvelope?.reaction,
       );
+      const parseReactionCount = (value: unknown): number => {
+        if (typeof value === "number" && Number.isFinite(value)) {
+          return value;
+        }
+        if (typeof value === "bigint") {
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : 0;
+        }
+        if (typeof value === "string" && value.trim().length > 0) {
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : 0;
+        }
+        return 0;
+      };
+      const normalizeReactionTypeLabel = (value: unknown): string | undefined => {
+        if (typeof value !== "string") {
+          return undefined;
+        }
+        const trimmed = value.trim();
+        if (!trimmed) {
+          return undefined;
+        }
+        return trimmed.toLowerCase().replace(/[_-]/g, "");
+      };
       const summaryParts = reactionEntries.map((entry) => {
         const typedEntry =
           entry && typeof entry === "object"
             ? (entry as {
                 type?: string;
                 emoji?: string;
+                emoticon?: string;
+                unicode_emoji?: string;
+                unicodeEmoji?: string;
                 custom_emoji_id?: unknown;
                 custom_emoji?: unknown;
                 customEmojiId?: unknown;
@@ -1615,16 +1642,22 @@ export const registerTelegramHandlers = ({
                 paid?: boolean;
                 is_paid?: boolean;
                 isPaid?: boolean;
-                total_count?: number;
-                totalCount?: number;
+                total_count?: unknown;
+                totalCount?: unknown;
               })
             : {};
-        const count =
-          typeof typedEntry.total_count === "number"
-            ? typedEntry.total_count
-            : typeof typedEntry.totalCount === "number"
-              ? typedEntry.totalCount
-              : 0;
+        const count = parseReactionCount(typedEntry.total_count ?? typedEntry.totalCount);
+        const normalizedType = normalizeReactionTypeLabel(typedEntry.type);
+        const emoji =
+          typeof typedEntry.emoji === "string" && typedEntry.emoji.length > 0
+            ? typedEntry.emoji
+            : typeof typedEntry.emoticon === "string" && typedEntry.emoticon.length > 0
+              ? typedEntry.emoticon
+              : typeof typedEntry.unicode_emoji === "string" && typedEntry.unicode_emoji.length > 0
+                ? typedEntry.unicode_emoji
+                : typeof typedEntry.unicodeEmoji === "string" && typedEntry.unicodeEmoji.length > 0
+                  ? typedEntry.unicodeEmoji
+                  : undefined;
         const customEmojiRaw =
           typedEntry.custom_emoji_id ??
           typedEntry.custom_emoji ??
@@ -1639,23 +1672,27 @@ export const registerTelegramHandlers = ({
                 ? customEmojiRaw.toString()
                 : undefined;
         const isPaidReaction =
-          typedEntry.type === "paid" ||
+          normalizedType === "paid" ||
           typedEntry.paid === true ||
           typedEntry.is_paid === true ||
           typedEntry.isPaid === true;
-        if (typedEntry.type === "emoji" || (!typedEntry.type && typedEntry.emoji)) {
-          return `${typedEntry.emoji ?? "emoji"}:${count}`;
+        if (normalizedType === "emoji" || (!normalizedType && emoji)) {
+          return `${emoji ?? "emoji"}:${count}`;
         }
         if (
-          typedEntry.type === "custom_emoji" ||
-          (!typedEntry.type && typeof customEmojiId === "string")
+          normalizedType === "customemoji" ||
+          (!normalizedType && typeof customEmojiId === "string")
         ) {
           return `custom:${customEmojiId ?? "unknown"}:${count}`;
         }
         if (isPaidReaction) {
           return `paid:${count}`;
         }
-        return `${typedEntry.type ?? "unknown"}:${count}`;
+        const fallbackType =
+          typeof typedEntry.type === "string" && typedEntry.type.length > 0
+            ? typedEntry.type
+            : "unknown";
+        return `${fallbackType}:${count}`;
       });
       const summary = summaryParts.length > 0 ? summaryParts.join(",") : "none";
 

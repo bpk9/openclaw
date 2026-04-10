@@ -2201,6 +2201,49 @@ describe("createTelegramBot", () => {
     );
   });
 
+  it("enqueues reaction_count fallback with normalized type/emoji aliases", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction_count") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: {
+        update_id: 50001,
+        messageReactionCount: {
+          chat: { id: 43211, type: "private" },
+          messageId: 5511,
+          reaction: [
+            { type: "customEmoji", customEmoji: "ce_alias", totalCount: "2" },
+            { type: "emoji", unicodeEmoji: FIRE_EMOJI, totalCount: 3 },
+          ],
+        },
+      },
+      messageReactionCount: {
+        reaction: [],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      `Telegram reaction count changed on msg 5511: custom:ce_alias:2,${FIRE_EMOJI}:3`,
+      expect.objectContaining({
+        contextKey: expect.stringContaining(
+          `telegram:reaction:count:43211:5511:custom:ce_alias:2,${FIRE_EMOJI}:3`,
+        ),
+      }),
+    );
+  });
+
   it("enqueues reaction_count fallback from flattened envelope fields", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();
