@@ -1074,18 +1074,28 @@ export const registerTelegramHandlers = ({
             newReaction?: unknown;
           }
         | undefined;
+      const coerceReactionArrayCandidate = (value: unknown): unknown[] | null => {
+        if (Array.isArray(value)) {
+          return value;
+        }
+        if (normalizeReaction(value) !== null) {
+          return [value];
+        }
+        return null;
+      };
       const resolveReactionArray = (...values: unknown[]): unknown[] => {
         let firstArray: unknown[] | null = null;
         let firstNonEmptyArray: unknown[] | null = null;
         for (const value of values) {
-          if (!Array.isArray(value)) {
+          const candidate = coerceReactionArrayCandidate(value);
+          if (!candidate) {
             continue;
           }
-          firstArray ??= value;
-          if (value.length > 0) {
-            firstNonEmptyArray ??= value;
-            if (value.some((item) => normalizeReaction(item) !== null)) {
-              return value;
+          firstArray ??= candidate;
+          if (candidate.length > 0) {
+            firstNonEmptyArray ??= candidate;
+            if (candidate.some((item) => normalizeReaction(item) !== null)) {
+              return candidate;
             }
           }
         }
