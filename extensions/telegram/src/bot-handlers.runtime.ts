@@ -1133,6 +1133,8 @@ export const registerTelegramHandlers = ({
           type?: string;
           emoji?: string;
           emoticon?: string;
+          unicode_emoji?: string;
+          unicodeEmoji?: string;
           custom_emoji_id?: unknown;
           custom_emoji?: unknown;
           customEmojiId?: unknown;
@@ -1174,7 +1176,13 @@ export const registerTelegramHandlers = ({
             ? reactionValue.emoji
             : typeof reactionValue.emoticon === "string" && reactionValue.emoticon.length > 0
               ? reactionValue.emoticon
-              : undefined;
+              : typeof reactionValue.unicode_emoji === "string" &&
+                  reactionValue.unicode_emoji.length > 0
+                ? reactionValue.unicode_emoji
+                : typeof reactionValue.unicodeEmoji === "string" &&
+                    reactionValue.unicodeEmoji.length > 0
+                  ? reactionValue.unicodeEmoji
+                  : undefined;
         if (normalizedReactionType === "emoji" && emojiValue) {
           return { key: `emoji:${emojiValue}`, display: emojiValue };
         }
