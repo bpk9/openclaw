@@ -2660,6 +2660,41 @@ describe("createTelegramBot", () => {
     );
   });
 
+  it("handles reaction payloads that omit type but include emoji fields", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 5038 },
+      messageReaction: {
+        chat: { id: 1234, type: "private" },
+        message_id: 107,
+        user: { id: 9, first_name: "Ada" },
+        date: 1736380800,
+        old_reaction: [{ emoji: FIRE_EMOJI }],
+        new_reaction: [{ emoji: FIRE_EMOJI }, { custom_emoji_id: "ce_2" }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      "Telegram reaction added: custom_emoji:ce_2 by Ada on msg 107",
+      expect.any(Object),
+    );
+  });
+
   it("skips reaction in own mode when message is not sent by bot", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();

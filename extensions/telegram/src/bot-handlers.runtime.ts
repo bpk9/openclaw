@@ -950,15 +950,33 @@ export const registerTelegramHandlers = ({
           custom_emoji_id?: string;
           customEmojiId?: string;
         };
-        if (reactionValue.type === "emoji" && typeof reactionValue.emoji === "string") {
-          return { key: `emoji:${reactionValue.emoji}`, display: reactionValue.emoji };
+        const reactionType =
+          typeof reactionValue.type === "string" && reactionValue.type.length > 0
+            ? reactionValue.type
+            : undefined;
+        const emojiValue =
+          typeof reactionValue.emoji === "string" && reactionValue.emoji.length > 0
+            ? reactionValue.emoji
+            : undefined;
+        if (reactionType === "emoji" && emojiValue) {
+          return { key: `emoji:${emojiValue}`, display: emojiValue };
         }
         const customEmojiId = reactionValue.custom_emoji_id ?? reactionValue.customEmojiId;
         if (
-          reactionValue.type === "custom_emoji" &&
+          reactionType === "custom_emoji" &&
           typeof customEmojiId === "string" &&
           customEmojiId.length > 0
         ) {
+          return {
+            key: `custom_emoji:${customEmojiId}`,
+            display: `custom_emoji:${customEmojiId}`,
+          };
+        }
+        // Some adapter/runtime paths omit `type` while still carrying emoji/custom IDs.
+        if (emojiValue) {
+          return { key: `emoji:${emojiValue}`, display: emojiValue };
+        }
+        if (typeof customEmojiId === "string" && customEmojiId.length > 0) {
           return {
             key: `custom_emoji:${customEmojiId}`,
             display: `custom_emoji:${customEmojiId}`,
