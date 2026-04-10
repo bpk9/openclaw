@@ -1158,6 +1158,35 @@ export const registerTelegramHandlers = ({
           if (typeof candidate === "bigint") {
             return candidate.toString();
           }
+          if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+            const objectCandidate = candidate as {
+              id?: unknown;
+              value?: unknown;
+              identifier?: unknown;
+              custom_emoji_id?: unknown;
+              custom_emoji?: unknown;
+              customEmojiId?: unknown;
+              customEmoji?: unknown;
+            };
+            const nestedCandidates = [
+              objectCandidate.id,
+              objectCandidate.value,
+              objectCandidate.identifier,
+              objectCandidate.custom_emoji_id,
+              objectCandidate.custom_emoji,
+              objectCandidate.customEmojiId,
+              objectCandidate.customEmoji,
+            ];
+            for (const nestedCandidate of nestedCandidates) {
+              if (nestedCandidate === candidate) {
+                continue;
+              }
+              const normalizedNested = normalizeId(nestedCandidate);
+              if (normalizedNested) {
+                return normalizedNested;
+              }
+            }
+          }
           return undefined;
         };
         const reactionType =
@@ -1679,6 +1708,48 @@ export const registerTelegramHandlers = ({
         }
         return trimmed.toLowerCase().replace(/[_-]/g, "");
       };
+      const normalizeCustomEmojiId = (candidate: unknown): string | undefined => {
+        if (typeof candidate === "string") {
+          const trimmed = candidate.trim();
+          return trimmed.length > 0 ? trimmed : undefined;
+        }
+        if (typeof candidate === "number" && Number.isFinite(candidate)) {
+          return String(candidate);
+        }
+        if (typeof candidate === "bigint") {
+          return candidate.toString();
+        }
+        if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+          const objectCandidate = candidate as {
+            id?: unknown;
+            value?: unknown;
+            identifier?: unknown;
+            custom_emoji_id?: unknown;
+            custom_emoji?: unknown;
+            customEmojiId?: unknown;
+            customEmoji?: unknown;
+          };
+          const nestedCandidates = [
+            objectCandidate.id,
+            objectCandidate.value,
+            objectCandidate.identifier,
+            objectCandidate.custom_emoji_id,
+            objectCandidate.custom_emoji,
+            objectCandidate.customEmojiId,
+            objectCandidate.customEmoji,
+          ];
+          for (const nestedCandidate of nestedCandidates) {
+            if (nestedCandidate === candidate) {
+              continue;
+            }
+            const normalizedNested = normalizeCustomEmojiId(nestedCandidate);
+            if (normalizedNested) {
+              return normalizedNested;
+            }
+          }
+        }
+        return undefined;
+      };
       const summaryParts = reactionEntries.map((entry) => {
         const typedEntry =
           entry && typeof entry === "object"
@@ -1716,14 +1787,7 @@ export const registerTelegramHandlers = ({
           typedEntry.custom_emoji ??
           typedEntry.customEmojiId ??
           typedEntry.customEmoji;
-        const customEmojiId =
-          typeof customEmojiRaw === "string"
-            ? customEmojiRaw
-            : typeof customEmojiRaw === "number" && Number.isFinite(customEmojiRaw)
-              ? String(customEmojiRaw)
-              : typeof customEmojiRaw === "bigint"
-                ? customEmojiRaw.toString()
-                : undefined;
+        const customEmojiId = normalizeCustomEmojiId(customEmojiRaw);
         const isPaidReaction =
           normalizedType === "paid" ||
           typedEntry.paid === true ||
