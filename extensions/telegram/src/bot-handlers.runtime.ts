@@ -915,6 +915,10 @@ export const registerTelegramHandlers = ({
         if (typeof value === "number" && Number.isFinite(value)) {
           return value;
         }
+        if (typeof value === "bigint") {
+          const parsed = Number(value);
+          return Number.isSafeInteger(parsed) ? parsed : undefined;
+        }
         if (typeof value === "string" && value.trim().length > 0) {
           const parsed = Number(value);
           return Number.isFinite(parsed) ? parsed : undefined;
@@ -1487,6 +1491,10 @@ export const registerTelegramHandlers = ({
       const parseNumericId = (value: unknown): number | undefined => {
         if (typeof value === "number" && Number.isFinite(value)) {
           return value;
+        }
+        if (typeof value === "bigint") {
+          const parsed = Number(value);
+          return Number.isSafeInteger(parsed) ? parsed : undefined;
         }
         if (typeof value === "string" && value.trim().length > 0) {
           const parsed = Number(value);
