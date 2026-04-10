@@ -832,7 +832,9 @@ export const registerTelegramHandlers = ({
   // Handle emoji reactions to messages.
   bot.on("message_reaction", async (ctx) => {
     try {
-      const reaction = ctx.messageReaction ?? ctx.update?.message_reaction;
+      const parsedReaction = ctx.messageReaction;
+      const rawReaction = ctx.update?.message_reaction;
+      const reaction = parsedReaction ?? rawReaction;
       if (!reaction) {
         return;
       }
@@ -958,16 +960,34 @@ export const registerTelegramHandlers = ({
         oldReaction?: unknown;
         newReaction?: unknown;
       };
-      const oldReactionValues = Array.isArray(reactionArrays.old_reaction)
-        ? reactionArrays.old_reaction
-        : Array.isArray(reactionArrays.oldReaction)
-          ? reactionArrays.oldReaction
-          : [];
-      const newReactionValues = Array.isArray(reactionArrays.new_reaction)
-        ? reactionArrays.new_reaction
-        : Array.isArray(reactionArrays.newReaction)
-          ? reactionArrays.newReaction
-          : [];
+      const rawReactionArrays = rawReaction as
+        | {
+            old_reaction?: unknown;
+            new_reaction?: unknown;
+            oldReaction?: unknown;
+            newReaction?: unknown;
+          }
+        | undefined;
+      const firstReactionArray = (...values: unknown[]): unknown[] => {
+        for (const value of values) {
+          if (Array.isArray(value)) {
+            return value;
+          }
+        }
+        return [];
+      };
+      const oldReactionValues = firstReactionArray(
+        reactionArrays.old_reaction,
+        reactionArrays.oldReaction,
+        rawReactionArrays?.old_reaction,
+        rawReactionArrays?.oldReaction,
+      );
+      const newReactionValues = firstReactionArray(
+        reactionArrays.new_reaction,
+        reactionArrays.newReaction,
+        rawReactionArrays?.new_reaction,
+        rawReactionArrays?.newReaction,
+      );
       const oldReactionKeys = new Set(
         oldReactionValues.map(normalizeReaction).flatMap((r) => (r ? [r.key] : [])),
       );
