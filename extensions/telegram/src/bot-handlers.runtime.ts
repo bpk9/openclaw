@@ -1084,15 +1084,25 @@ export const registerTelegramHandlers = ({
       // Telegram updates are snake_case, but adapter paths may expose camelCase
       // reaction arrays. Normalize both shapes to avoid silent no-op drops.
       const parseReactionJson = (value: string): unknown | null => {
-        const trimmed = value.trim();
-        if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) {
-          return null;
+        let candidate = value.trim();
+        for (let depth = 0; depth < 3; depth += 1) {
+          const isJsonLike =
+            candidate.startsWith("{") || candidate.startsWith("[") || candidate.startsWith('"');
+          if (!isJsonLike) {
+            return depth === 0 ? null : candidate;
+          }
+          try {
+            const parsed = JSON.parse(candidate) as unknown;
+            if (typeof parsed === "string") {
+              candidate = parsed.trim();
+              continue;
+            }
+            return parsed;
+          } catch {
+            return null;
+          }
         }
-        try {
-          return JSON.parse(trimmed) as unknown;
-        } catch {
-          return null;
-        }
+        return candidate;
       };
       const normalizeReaction = (value: unknown): { key: string; display: string } | null => {
         if (typeof value === "string") {

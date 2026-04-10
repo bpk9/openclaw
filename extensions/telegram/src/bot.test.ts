@@ -3623,6 +3623,44 @@ describe("createTelegramBot", () => {
     );
   });
 
+  it("handles reaction payloads with double-encoded JSON-string reaction entries", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 504021 },
+      messageReaction: {
+        chat: { id: 1234, type: "private" },
+        message_id: 10921,
+        user: { id: 9, first_name: "Ada" },
+        date: 1736380800,
+        old_reaction: [JSON.stringify('{"type":"emoji","emoji":"🔥"}')],
+        new_reaction: [
+          JSON.stringify('{"type":"emoji","emoji":"🔥"}'),
+          JSON.stringify('{"type":"emoji","emoji":"🤩"}'),
+        ],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      "Telegram reaction added: 🤩 by Ada on msg 10921",
+      expect.any(Object),
+    );
+  });
+
   it("handles reaction payloads with singleton object reaction arrays", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();
