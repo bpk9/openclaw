@@ -1785,26 +1785,42 @@ export const registerTelegramHandlers = ({
         }
         return undefined;
       };
+      const unwrapReactionCountEntry = (entry: unknown): Record<string, unknown> => {
+        if (!entry || typeof entry !== "object") {
+          return {};
+        }
+        const objectEntry = entry as {
+          reaction?: unknown;
+          reaction_type?: unknown;
+          reactionType?: unknown;
+        };
+        const wrappedReaction =
+          objectEntry.reaction ?? objectEntry.reaction_type ?? objectEntry.reactionType;
+        if (wrappedReaction && typeof wrappedReaction === "object" && !Array.isArray(wrappedReaction)) {
+          return {
+            ...(wrappedReaction as Record<string, unknown>),
+            ...(entry as Record<string, unknown>),
+          };
+        }
+        return entry as Record<string, unknown>;
+      };
       const summaryParts = reactionEntries.map((entry) => {
-        const typedEntry =
-          entry && typeof entry === "object"
-            ? (entry as {
-                type?: string;
-                emoji?: string;
-                emoticon?: string;
-                unicode_emoji?: string;
-                unicodeEmoji?: string;
-                custom_emoji_id?: unknown;
-                custom_emoji?: unknown;
-                customEmojiId?: unknown;
-                customEmoji?: unknown;
-                paid?: boolean;
-                is_paid?: boolean;
-                isPaid?: boolean;
-                total_count?: unknown;
-                totalCount?: unknown;
-              })
-            : {};
+        const typedEntry = unwrapReactionCountEntry(entry) as {
+          type?: string;
+          emoji?: string;
+          emoticon?: string;
+          unicode_emoji?: string;
+          unicodeEmoji?: string;
+          custom_emoji_id?: unknown;
+          custom_emoji?: unknown;
+          customEmojiId?: unknown;
+          customEmoji?: unknown;
+          paid?: boolean;
+          is_paid?: boolean;
+          isPaid?: boolean;
+          total_count?: unknown;
+          totalCount?: unknown;
+        };
         const count = parseReactionCount(typedEntry.total_count ?? typedEntry.totalCount);
         const normalizedType = normalizeReactionTypeLabel(typedEntry.type);
         const emoji =
