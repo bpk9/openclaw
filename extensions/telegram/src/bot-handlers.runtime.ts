@@ -1079,9 +1079,31 @@ export const registerTelegramHandlers = ({
       // Detect added reactions (emoji + custom emoji).
       // Telegram updates are snake_case, but adapter paths may expose camelCase
       // reaction arrays. Normalize both shapes to avoid silent no-op drops.
+      const parseReactionJson = (value: string): unknown | null => {
+        const trimmed = value.trim();
+        if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) {
+          return null;
+        }
+        try {
+          return JSON.parse(trimmed) as unknown;
+        } catch {
+          return null;
+        }
+      };
       const normalizeReaction = (value: unknown): { key: string; display: string } | null => {
-        if (typeof value === "string" && value.length > 0) {
-          return { key: `emoji:${value}`, display: value };
+        if (typeof value === "string") {
+          const parsed = parseReactionJson(value);
+          if (parsed !== null) {
+            const parsedReaction = normalizeReaction(parsed);
+            if (parsedReaction) {
+              return parsedReaction;
+            }
+          }
+          const trimmed = value.trim();
+          if (trimmed.length > 0) {
+            return { key: `emoji:${trimmed}`, display: trimmed };
+          }
+          return null;
         }
         if (!value || typeof value !== "object") {
           return null;
@@ -1180,6 +1202,15 @@ export const registerTelegramHandlers = ({
       const coerceReactionArrayCandidate = (value: unknown): unknown[] | null => {
         if (Array.isArray(value)) {
           return value;
+        }
+        if (typeof value === "string") {
+          const parsed = parseReactionJson(value);
+          if (Array.isArray(parsed)) {
+            return parsed;
+          }
+          if (parsed !== null && normalizeReaction(parsed) !== null) {
+            return [parsed];
+          }
         }
         if (normalizeReaction(value) !== null) {
           return [value];
