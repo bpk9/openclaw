@@ -3382,6 +3382,47 @@ describe("createTelegramBot", () => {
     );
   });
 
+  it("uses flattened author_user_id aliases when reaction payload omits user field", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: {
+        update_id: 50362157,
+        messageReaction: {
+          chatId: "1234",
+          chatType: "private",
+          messageId: "1052157",
+          author_user_id: "9",
+          author_user_username: "ada_flat",
+          firstName: "Ada",
+          newReaction: [{ type: "emoji", emoji: PARTY_EMOJI }],
+        },
+      },
+      messageReaction: {
+        newReaction: [{ type: "emoji", emoji: PARTY_EMOJI }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      `Telegram reaction added: ${PARTY_EMOJI} by Ada (@ada_flat) on msg 1052157`,
+      expect.any(Object),
+    );
+  });
+
   it("uses actor alias when reaction payload omits user field", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();
