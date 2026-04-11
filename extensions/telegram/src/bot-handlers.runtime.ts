@@ -814,6 +814,10 @@ export const registerTelegramHandlers = ({
     messageReactionCountChanged?: unknown;
     message_reaction_counts_changed?: unknown;
     messageReactionCountsChanged?: unknown;
+    message_reaction_count_event?: unknown;
+    messageReactionCountEvent?: unknown;
+    message_reaction_counts_event?: unknown;
+    messageReactionCountsEvent?: unknown;
   };
   const resolveRawReaction = (update: unknown): Record<string, unknown> | undefined => {
     const typedUpdate = update as TelegramReactionUpdateAliases | undefined;
@@ -847,7 +851,11 @@ export const registerTelegramHandlers = ({
       typedUpdate?.message_reaction_count_changed ??
       typedUpdate?.messageReactionCountChanged ??
       typedUpdate?.message_reaction_counts_changed ??
-      typedUpdate?.messageReactionCountsChanged) as Record<string, unknown> | undefined;
+      typedUpdate?.messageReactionCountsChanged ??
+      typedUpdate?.message_reaction_count_event ??
+      typedUpdate?.messageReactionCountEvent ??
+      typedUpdate?.message_reaction_counts_event ??
+      typedUpdate?.messageReactionCountsEvent) as Record<string, unknown> | undefined;
   };
   bot.use(async (ctx, next) => {
     const middlewareDiagAll = process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_POLL === "1";
