@@ -865,7 +865,19 @@ export const registerTelegramHandlers = ({
         messageId?: number;
         user_id?: number | string;
         userId?: number | string;
+        from_id?: number | string;
+        fromId?: number | string;
+        sender_id?: number | string;
+        senderId?: number | string;
+        actor_id?: number | string;
+        actorId?: number | string;
         username?: string;
+        from_username?: string;
+        fromUsername?: string;
+        sender_username?: string;
+        senderUsername?: string;
+        actor_username?: string;
+        actorUsername?: string;
         first_name?: string;
         firstName?: string;
         last_name?: string;
@@ -916,7 +928,19 @@ export const registerTelegramHandlers = ({
             messageId?: number;
             user_id?: number | string;
             userId?: number | string;
+            from_id?: number | string;
+            fromId?: number | string;
+            sender_id?: number | string;
+            senderId?: number | string;
+            actor_id?: number | string;
+            actorId?: number | string;
             username?: string;
+            from_username?: string;
+            fromUsername?: string;
+            sender_username?: string;
+            senderUsername?: string;
+            actor_username?: string;
+            actorUsername?: string;
             first_name?: string;
             firstName?: string;
             last_name?: string;
@@ -1028,8 +1052,26 @@ export const registerTelegramHandlers = ({
         rawReactionEnvelope?.sender ??
         (() => {
           const flattenedUserId =
-            parseNumericId(reactionEnvelope.user_id ?? reactionEnvelope.userId) ??
-            parseNumericId(rawReactionEnvelope?.user_id ?? rawReactionEnvelope?.userId);
+            parseNumericId(
+              reactionEnvelope.user_id ??
+                reactionEnvelope.userId ??
+                reactionEnvelope.from_id ??
+                reactionEnvelope.fromId ??
+                reactionEnvelope.sender_id ??
+                reactionEnvelope.senderId ??
+                reactionEnvelope.actor_id ??
+                reactionEnvelope.actorId,
+            ) ??
+            parseNumericId(
+              rawReactionEnvelope?.user_id ??
+                rawReactionEnvelope?.userId ??
+                rawReactionEnvelope?.from_id ??
+                rawReactionEnvelope?.fromId ??
+                rawReactionEnvelope?.sender_id ??
+                rawReactionEnvelope?.senderId ??
+                rawReactionEnvelope?.actor_id ??
+                rawReactionEnvelope?.actorId,
+            );
           if (flattenedUserId == null) {
             return undefined;
           }
@@ -1037,7 +1079,19 @@ export const registerTelegramHandlers = ({
             id: flattenedUserId,
             username:
               reactionEnvelope.username ??
-              rawReactionEnvelope?.username,
+              reactionEnvelope.from_username ??
+              reactionEnvelope.fromUsername ??
+              reactionEnvelope.sender_username ??
+              reactionEnvelope.senderUsername ??
+              reactionEnvelope.actor_username ??
+              reactionEnvelope.actorUsername ??
+              rawReactionEnvelope?.username ??
+              rawReactionEnvelope?.from_username ??
+              rawReactionEnvelope?.fromUsername ??
+              rawReactionEnvelope?.sender_username ??
+              rawReactionEnvelope?.senderUsername ??
+              rawReactionEnvelope?.actor_username ??
+              rawReactionEnvelope?.actorUsername,
             is_bot:
               reactionEnvelope.is_bot ??
               reactionEnvelope.isBot ??
