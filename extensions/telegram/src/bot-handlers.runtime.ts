@@ -2062,6 +2062,11 @@ export const registerTelegramHandlers = ({
         rawReactionArrays?.afterReactions,
         rawReactionArrays?.currentReaction,
         rawReactionArrays?.currentReactions,
+        // Some adapter/runtime paths flatten the current reaction directly onto
+        // the message_reaction envelope (for example: { type, emoji }) without
+        // wrapping it in new_reaction/reaction keys.
+        reactionArrays,
+        rawReactionArrays,
       );
       const previousReactions = oldReactionValues
         .map(normalizeReaction)
