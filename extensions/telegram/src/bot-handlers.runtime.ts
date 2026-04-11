@@ -1719,6 +1719,8 @@ export const registerTelegramHandlers = ({
         new_value?: unknown;
         from_value?: unknown;
         to_value?: unknown;
+        before_value?: unknown;
+        after_value?: unknown;
         previous_value?: unknown;
         current_value?: unknown;
         old_reactions?: unknown;
@@ -1729,6 +1731,8 @@ export const registerTelegramHandlers = ({
         new_values?: unknown;
         from_values?: unknown;
         to_values?: unknown;
+        before_values?: unknown;
+        after_values?: unknown;
         previous_values?: unknown;
         current_values?: unknown;
         before_reaction?: unknown;
@@ -1753,6 +1757,8 @@ export const registerTelegramHandlers = ({
         newValue?: unknown;
         fromValue?: unknown;
         toValue?: unknown;
+        beforeValue?: unknown;
+        afterValue?: unknown;
         previousValue?: unknown;
         currentValue?: unknown;
         oldReactions?: unknown;
@@ -1763,6 +1769,8 @@ export const registerTelegramHandlers = ({
         newValues?: unknown;
         fromValues?: unknown;
         toValues?: unknown;
+        beforeValues?: unknown;
+        afterValues?: unknown;
         previousValues?: unknown;
         currentValues?: unknown;
         beforeReaction?: unknown;
@@ -1784,6 +1792,8 @@ export const registerTelegramHandlers = ({
             new_value?: unknown;
             from_value?: unknown;
             to_value?: unknown;
+            before_value?: unknown;
+            after_value?: unknown;
             previous_value?: unknown;
             current_value?: unknown;
             old_reactions?: unknown;
@@ -1794,6 +1804,8 @@ export const registerTelegramHandlers = ({
             new_values?: unknown;
             from_values?: unknown;
             to_values?: unknown;
+            before_values?: unknown;
+            after_values?: unknown;
             previous_values?: unknown;
             current_values?: unknown;
             before_reaction?: unknown;
@@ -1818,6 +1830,8 @@ export const registerTelegramHandlers = ({
             newValue?: unknown;
             fromValue?: unknown;
             toValue?: unknown;
+            beforeValue?: unknown;
+            afterValue?: unknown;
             previousValue?: unknown;
             currentValue?: unknown;
             oldReactions?: unknown;
@@ -1828,6 +1842,8 @@ export const registerTelegramHandlers = ({
             newValues?: unknown;
             fromValues?: unknown;
             toValues?: unknown;
+            beforeValues?: unknown;
+            afterValues?: unknown;
             previousValues?: unknown;
             currentValues?: unknown;
             beforeReaction?: unknown;
@@ -1950,11 +1966,13 @@ export const registerTelegramHandlers = ({
         reactionArrays.from_reaction,
         reactionArrays.old_value,
         reactionArrays.from_value,
+        reactionArrays.before_value,
         reactionArrays.previous_value,
         reactionArrays.old_reactions,
         reactionArrays.from_reactions,
         reactionArrays.old_values,
         reactionArrays.from_values,
+        reactionArrays.before_values,
         reactionArrays.previous_values,
         reactionArrays.before_reaction,
         reactionArrays.before_reactions,
@@ -1966,11 +1984,13 @@ export const registerTelegramHandlers = ({
         reactionArrays.fromReaction,
         reactionArrays.oldValue,
         reactionArrays.fromValue,
+        reactionArrays.beforeValue,
         reactionArrays.previousValue,
         reactionArrays.oldReactions,
         reactionArrays.fromReactions,
         reactionArrays.oldValues,
         reactionArrays.fromValues,
+        reactionArrays.beforeValues,
         reactionArrays.previousValues,
         reactionArrays.beforeReaction,
         reactionArrays.beforeReactions,
@@ -1980,11 +2000,13 @@ export const registerTelegramHandlers = ({
         rawReactionArrays?.from_reaction,
         rawReactionArrays?.old_value,
         rawReactionArrays?.from_value,
+        rawReactionArrays?.before_value,
         rawReactionArrays?.previous_value,
         rawReactionArrays?.old_reactions,
         rawReactionArrays?.from_reactions,
         rawReactionArrays?.old_values,
         rawReactionArrays?.from_values,
+        rawReactionArrays?.before_values,
         rawReactionArrays?.previous_values,
         rawReactionArrays?.before_reaction,
         rawReactionArrays?.before_reactions,
@@ -1996,11 +2018,13 @@ export const registerTelegramHandlers = ({
         rawReactionArrays?.fromReaction,
         rawReactionArrays?.oldValue,
         rawReactionArrays?.fromValue,
+        rawReactionArrays?.beforeValue,
         rawReactionArrays?.previousValue,
         rawReactionArrays?.oldReactions,
         rawReactionArrays?.fromReactions,
         rawReactionArrays?.oldValues,
         rawReactionArrays?.fromValues,
+        rawReactionArrays?.beforeValues,
         rawReactionArrays?.previousValues,
         rawReactionArrays?.beforeReaction,
         rawReactionArrays?.beforeReactions,
@@ -2012,11 +2036,13 @@ export const registerTelegramHandlers = ({
         reactionArrays.to_reaction,
         reactionArrays.new_value,
         reactionArrays.to_value,
+        reactionArrays.after_value,
         reactionArrays.current_value,
         reactionArrays.new_reactions,
         reactionArrays.to_reactions,
         reactionArrays.new_values,
         reactionArrays.to_values,
+        reactionArrays.after_values,
         reactionArrays.current_values,
         reactionArrays.after_reaction,
         reactionArrays.after_reactions,
@@ -2030,11 +2056,13 @@ export const registerTelegramHandlers = ({
         reactionArrays.toReaction,
         reactionArrays.newValue,
         reactionArrays.toValue,
+        reactionArrays.afterValue,
         reactionArrays.currentValue,
         reactionArrays.newReactions,
         reactionArrays.toReactions,
         reactionArrays.newValues,
         reactionArrays.toValues,
+        reactionArrays.afterValues,
         reactionArrays.currentValues,
         reactionArrays.afterReaction,
         reactionArrays.afterReactions,
@@ -2044,11 +2072,13 @@ export const registerTelegramHandlers = ({
         rawReactionArrays?.to_reaction,
         rawReactionArrays?.new_value,
         rawReactionArrays?.to_value,
+        rawReactionArrays?.after_value,
         rawReactionArrays?.current_value,
         rawReactionArrays?.new_reactions,
         rawReactionArrays?.to_reactions,
         rawReactionArrays?.new_values,
         rawReactionArrays?.to_values,
+        rawReactionArrays?.after_values,
         rawReactionArrays?.current_values,
         rawReactionArrays?.after_reaction,
         rawReactionArrays?.after_reactions,
@@ -2062,11 +2092,13 @@ export const registerTelegramHandlers = ({
         rawReactionArrays?.toReaction,
         rawReactionArrays?.newValue,
         rawReactionArrays?.toValue,
+        rawReactionArrays?.afterValue,
         rawReactionArrays?.currentValue,
         rawReactionArrays?.newReactions,
         rawReactionArrays?.toReactions,
         rawReactionArrays?.newValues,
         rawReactionArrays?.toValues,
+        rawReactionArrays?.afterValues,
         rawReactionArrays?.currentValues,
         rawReactionArrays?.afterReaction,
         rawReactionArrays?.afterReactions,
