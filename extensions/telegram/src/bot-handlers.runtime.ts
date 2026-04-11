@@ -794,6 +794,10 @@ export const registerTelegramHandlers = ({
     messageReactionUpdated?: unknown;
     message_reactions_updated?: unknown;
     messageReactionsUpdated?: unknown;
+    message_reaction_changed?: unknown;
+    messageReactionChanged?: unknown;
+    message_reactions_changed?: unknown;
+    messageReactionsChanged?: unknown;
     message_reaction_count?: unknown;
     messageReactionCount?: unknown;
     message_reaction_counts?: unknown;
@@ -802,6 +806,10 @@ export const registerTelegramHandlers = ({
     messageReactionCountUpdated?: unknown;
     message_reaction_counts_updated?: unknown;
     messageReactionCountsUpdated?: unknown;
+    message_reaction_count_changed?: unknown;
+    messageReactionCountChanged?: unknown;
+    message_reaction_counts_changed?: unknown;
+    messageReactionCountsChanged?: unknown;
   };
   const resolveRawReaction = (update: unknown): Record<string, unknown> | undefined => {
     const typedUpdate = update as TelegramReactionUpdateAliases | undefined;
@@ -812,7 +820,11 @@ export const registerTelegramHandlers = ({
       typedUpdate?.message_reaction_updated ??
       typedUpdate?.messageReactionUpdated ??
       typedUpdate?.message_reactions_updated ??
-      typedUpdate?.messageReactionsUpdated) as Record<string, unknown> | undefined;
+      typedUpdate?.messageReactionsUpdated ??
+      typedUpdate?.message_reaction_changed ??
+      typedUpdate?.messageReactionChanged ??
+      typedUpdate?.message_reactions_changed ??
+      typedUpdate?.messageReactionsChanged) as Record<string, unknown> | undefined;
   };
   const resolveRawReactionCount = (update: unknown): Record<string, unknown> | undefined => {
     const typedUpdate = update as TelegramReactionUpdateAliases | undefined;
@@ -823,7 +835,11 @@ export const registerTelegramHandlers = ({
       typedUpdate?.message_reaction_count_updated ??
       typedUpdate?.messageReactionCountUpdated ??
       typedUpdate?.message_reaction_counts_updated ??
-      typedUpdate?.messageReactionCountsUpdated) as Record<string, unknown> | undefined;
+      typedUpdate?.messageReactionCountsUpdated ??
+      typedUpdate?.message_reaction_count_changed ??
+      typedUpdate?.messageReactionCountChanged ??
+      typedUpdate?.message_reaction_counts_changed ??
+      typedUpdate?.messageReactionCountsChanged) as Record<string, unknown> | undefined;
   };
   bot.use(async (ctx, next) => {
     const middlewareDiagAll = process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_POLL === "1";
