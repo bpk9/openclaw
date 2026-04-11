@@ -785,18 +785,34 @@ export const registerTelegramHandlers = ({
     process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_HANDLER === "1" ||
     process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_POLL === "1";
   const reactionPipelineDiag = reactionDiagEnabled ? (runtime.error ?? runtime.info) : undefined;
+  type TelegramReactionUpdateAliases = {
+    message_reaction?: unknown;
+    messageReaction?: unknown;
+    message_reaction_updated?: unknown;
+    messageReactionUpdated?: unknown;
+    message_reaction_count?: unknown;
+    messageReactionCount?: unknown;
+    message_reaction_count_updated?: unknown;
+    messageReactionCountUpdated?: unknown;
+  };
+  const resolveRawReaction = (update: unknown): Record<string, unknown> | undefined => {
+    const typedUpdate = update as TelegramReactionUpdateAliases | undefined;
+    return (typedUpdate?.message_reaction ??
+      typedUpdate?.messageReaction ??
+      typedUpdate?.message_reaction_updated ??
+      typedUpdate?.messageReactionUpdated) as Record<string, unknown> | undefined;
+  };
+  const resolveRawReactionCount = (update: unknown): Record<string, unknown> | undefined => {
+    const typedUpdate = update as TelegramReactionUpdateAliases | undefined;
+    return (typedUpdate?.message_reaction_count ??
+      typedUpdate?.messageReactionCount ??
+      typedUpdate?.message_reaction_count_updated ??
+      typedUpdate?.messageReactionCountUpdated) as Record<string, unknown> | undefined;
+  };
   bot.use(async (ctx, next) => {
     const middlewareDiagAll = process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_POLL === "1";
-    const rawReaction =
-      ctx.update?.message_reaction ??
-      ((ctx.update as { messageReaction?: unknown } | undefined)?.messageReaction as
-        | Record<string, unknown>
-        | undefined);
-    const rawReactionCount =
-      ctx.update?.message_reaction_count ??
-      ((ctx.update as { messageReactionCount?: unknown } | undefined)?.messageReactionCount as
-        | Record<string, unknown>
-        | undefined);
+    const rawReaction = resolveRawReaction(ctx.update);
+    const rawReactionCount = resolveRawReactionCount(ctx.update);
     const parsedReaction = ctx.messageReaction;
     const parsedReactionCount = ctx.messageReactionCount;
     const shouldEmitMiddlewareDiag =
@@ -841,11 +857,7 @@ export const registerTelegramHandlers = ({
   bot.on("message_reaction", async (ctx) => {
     try {
       const parsedReaction = ctx.messageReaction;
-      const rawReaction =
-        ctx.update?.message_reaction ??
-        ((ctx.update as { messageReaction?: unknown } | undefined)?.messageReaction as
-          | Record<string, unknown>
-          | undefined);
+      const rawReaction = resolveRawReaction(ctx.update);
       const reaction = parsedReaction ?? rawReaction;
       if (!reaction) {
         return;
@@ -1433,7 +1445,7 @@ export const registerTelegramHandlers = ({
 
       const skippedByUpdateGate = shouldSkipUpdate(ctx);
       reactionPipelineDiag?.(
-        `${reactionDiagPrefix} stage=pre-skip skipped=${skippedByUpdateGate} hasParsedReaction=${Boolean(ctx.messageReaction)} hasRawReaction=${Boolean(ctx.update?.message_reaction)}`,
+        `${reactionDiagPrefix} stage=pre-skip skipped=${skippedByUpdateGate} hasParsedReaction=${Boolean(ctx.messageReaction)} hasRawReaction=${Boolean(rawReaction)}`,
       );
       if (skippedByUpdateGate) {
         return;
@@ -3636,11 +3648,7 @@ export const registerTelegramHandlers = ({
   // without per-user message_reaction payloads.
   bot.on("message_reaction_count", async (ctx) => {
     try {
-      const rawReactionCount =
-        ctx.update?.message_reaction_count ??
-        ((ctx.update as { messageReactionCount?: unknown } | undefined)?.messageReactionCount as
-          | Record<string, unknown>
-          | undefined);
+      const rawReactionCount = resolveRawReactionCount(ctx.update);
       const reactionCount = ctx.messageReactionCount ?? rawReactionCount;
       if (!reactionCount) {
         return;
