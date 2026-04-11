@@ -790,6 +790,10 @@ export const registerTelegramHandlers = ({
     messageReaction?: unknown;
     message_reactions?: unknown;
     messageReactions?: unknown;
+    message_reaction_update?: unknown;
+    messageReactionUpdate?: unknown;
+    message_reactions_update?: unknown;
+    messageReactionsUpdate?: unknown;
     message_reaction_updated?: unknown;
     messageReactionUpdated?: unknown;
     message_reactions_updated?: unknown;
@@ -806,6 +810,10 @@ export const registerTelegramHandlers = ({
     messageReactionCount?: unknown;
     message_reaction_counts?: unknown;
     messageReactionCounts?: unknown;
+    message_reaction_count_update?: unknown;
+    messageReactionCountUpdate?: unknown;
+    message_reaction_counts_update?: unknown;
+    messageReactionCountsUpdate?: unknown;
     message_reaction_count_updated?: unknown;
     messageReactionCountUpdated?: unknown;
     message_reaction_counts_updated?: unknown;
@@ -825,6 +833,10 @@ export const registerTelegramHandlers = ({
       typedUpdate?.messageReaction ??
       typedUpdate?.message_reactions ??
       typedUpdate?.messageReactions ??
+      typedUpdate?.message_reaction_update ??
+      typedUpdate?.messageReactionUpdate ??
+      typedUpdate?.message_reactions_update ??
+      typedUpdate?.messageReactionsUpdate ??
       typedUpdate?.message_reaction_updated ??
       typedUpdate?.messageReactionUpdated ??
       typedUpdate?.message_reactions_updated ??
@@ -844,6 +856,10 @@ export const registerTelegramHandlers = ({
       typedUpdate?.messageReactionCount ??
       typedUpdate?.message_reaction_counts ??
       typedUpdate?.messageReactionCounts ??
+      typedUpdate?.message_reaction_count_update ??
+      typedUpdate?.messageReactionCountUpdate ??
+      typedUpdate?.message_reaction_counts_update ??
+      typedUpdate?.messageReactionCountsUpdate ??
       typedUpdate?.message_reaction_count_updated ??
       typedUpdate?.messageReactionCountUpdated ??
       typedUpdate?.message_reaction_counts_updated ??
