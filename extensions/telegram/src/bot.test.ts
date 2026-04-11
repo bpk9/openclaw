@@ -3829,6 +3829,49 @@ describe("createTelegramBot", () => {
     );
   });
 
+  it("uses message_reactions_updated raw update when parsed reaction omits arrays", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: {
+        update_id: 50372,
+        message_reactions_updated: {
+          chat: { id: 1234, type: "private" },
+          message_id: 1062,
+          user: { id: 9, first_name: "Ada" },
+          date: 1736380800,
+          old_reaction: [],
+          new_reaction: [{ type: "emoji", emoji: HEART_EMOJI }],
+        },
+      },
+      messageReaction: {
+        chat: { id: 1234, type: "private" },
+        message_id: 1062,
+        user: { id: 9, first_name: "Ada" },
+        date: 1736380800,
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      `Telegram reaction added: ${HEART_EMOJI} by Ada on msg 1062`,
+      expect.any(Object),
+    );
+  });
+
   it("handles reaction payloads that omit type but include emoji fields", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();
