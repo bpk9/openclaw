@@ -798,6 +798,10 @@ export const registerTelegramHandlers = ({
     messageReactionChanged?: unknown;
     message_reactions_changed?: unknown;
     messageReactionsChanged?: unknown;
+    message_reaction_event?: unknown;
+    messageReactionEvent?: unknown;
+    message_reactions_event?: unknown;
+    messageReactionsEvent?: unknown;
     message_reaction_count?: unknown;
     messageReactionCount?: unknown;
     message_reaction_counts?: unknown;
@@ -824,7 +828,11 @@ export const registerTelegramHandlers = ({
       typedUpdate?.message_reaction_changed ??
       typedUpdate?.messageReactionChanged ??
       typedUpdate?.message_reactions_changed ??
-      typedUpdate?.messageReactionsChanged) as Record<string, unknown> | undefined;
+      typedUpdate?.messageReactionsChanged ??
+      typedUpdate?.message_reaction_event ??
+      typedUpdate?.messageReactionEvent ??
+      typedUpdate?.message_reactions_event ??
+      typedUpdate?.messageReactionsEvent) as Record<string, unknown> | undefined;
   };
   const resolveRawReactionCount = (update: unknown): Record<string, unknown> | undefined => {
     const typedUpdate = update as TelegramReactionUpdateAliases | undefined;
