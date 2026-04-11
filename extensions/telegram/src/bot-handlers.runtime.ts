@@ -936,6 +936,20 @@ export const registerTelegramHandlers = ({
           first_name?: string;
           last_name?: string;
         };
+        author_user?: {
+          id?: number;
+          username?: string;
+          is_bot?: boolean;
+          first_name?: string;
+          last_name?: string;
+        };
+        authorUser?: {
+          id?: number;
+          username?: string;
+          is_bot?: boolean;
+          first_name?: string;
+          last_name?: string;
+        };
         actor?: {
           id?: number;
           username?: string;
@@ -1071,6 +1085,20 @@ export const registerTelegramHandlers = ({
               first_name?: string;
               last_name?: string;
             };
+            author_user?: {
+              id?: number;
+              username?: string;
+              is_bot?: boolean;
+              first_name?: string;
+              last_name?: string;
+            };
+            authorUser?: {
+              id?: number;
+              username?: string;
+              is_bot?: boolean;
+              first_name?: string;
+              last_name?: string;
+            };
             actor?: {
               id?: number;
               username?: string;
@@ -1173,6 +1201,8 @@ export const registerTelegramHandlers = ({
         reactionEnvelope.from_user ??
         reactionEnvelope.fromUser ??
         reactionEnvelope.author ??
+        reactionEnvelope.author_user ??
+        reactionEnvelope.authorUser ??
         reactionEnvelope.actor ??
         reactionEnvelope.sender ??
         reactionEnvelope.sender_user ??
@@ -1210,6 +1240,8 @@ export const registerTelegramHandlers = ({
         rawReactionEnvelope?.from_user ??
         rawReactionEnvelope?.fromUser ??
         rawReactionEnvelope?.author ??
+        rawReactionEnvelope?.author_user ??
+        rawReactionEnvelope?.authorUser ??
         rawReactionEnvelope?.actor ??
         rawReactionEnvelope?.sender ??
         rawReactionEnvelope?.sender_user ??
