@@ -912,6 +912,34 @@ export const registerTelegramHandlers = ({
           first_name?: string;
           last_name?: string;
         };
+        actor?: {
+          id?: number;
+          username?: string;
+          is_bot?: boolean;
+          first_name?: string;
+          last_name?: string;
+        };
+        sender?: {
+          id?: number;
+          username?: string;
+          is_bot?: boolean;
+          first_name?: string;
+          last_name?: string;
+        };
+        sender_user?: {
+          id?: number;
+          username?: string;
+          is_bot?: boolean;
+          first_name?: string;
+          last_name?: string;
+        };
+        senderUser?: {
+          id?: number;
+          username?: string;
+          is_bot?: boolean;
+          first_name?: string;
+          last_name?: string;
+        };
       };
       const rawReactionEnvelope = rawReaction as
         | {
@@ -989,6 +1017,20 @@ export const registerTelegramHandlers = ({
               first_name?: string;
               last_name?: string;
             };
+            sender_user?: {
+              id?: number;
+              username?: string;
+              is_bot?: boolean;
+              first_name?: string;
+              last_name?: string;
+            };
+            senderUser?: {
+              id?: number;
+              username?: string;
+              is_bot?: boolean;
+              first_name?: string;
+              last_name?: string;
+            };
           }
         | undefined;
       const parseNumericId = (value: unknown): number | undefined => {
@@ -1044,12 +1086,16 @@ export const registerTelegramHandlers = ({
         reactionEnvelope.fromUser ??
         reactionEnvelope.actor ??
         reactionEnvelope.sender ??
+        reactionEnvelope.sender_user ??
+        reactionEnvelope.senderUser ??
         rawReactionEnvelope?.user ??
         rawReactionEnvelope?.from ??
         rawReactionEnvelope?.from_user ??
         rawReactionEnvelope?.fromUser ??
         rawReactionEnvelope?.actor ??
         rawReactionEnvelope?.sender ??
+        rawReactionEnvelope?.sender_user ??
+        rawReactionEnvelope?.senderUser ??
         (() => {
           const flattenedUserId =
             parseNumericId(
