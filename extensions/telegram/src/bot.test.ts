@@ -5567,6 +5567,46 @@ describe("createTelegramBot", () => {
     );
   });
 
+  it("handles reaction payloads with nested diff older/newer aliases", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 504021102 },
+      messageReaction: {
+        chat: { id: 1234, type: "private" },
+        message_id: 10921102,
+        user: { id: 9, first_name: "Ada" },
+        date: 1736380800,
+        diff: {
+          olderReaction: [{ type: "emoji", emoji: FIRE_EMOJI }],
+          newerReaction: [
+            { type: "emoji", emoji: FIRE_EMOJI },
+            { type: "emoji", emoji: PARTY_EMOJI },
+          ],
+        },
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      `Telegram reaction added: ${PARTY_EMOJI} by Ada on msg 10921102`,
+      expect.any(Object),
+    );
+  });
+
   it("handles reaction payloads with pastReaction/futureReaction reaction array keys", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();
