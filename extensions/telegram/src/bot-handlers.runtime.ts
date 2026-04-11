@@ -1864,6 +1864,9 @@ export const registerTelegramHandlers = ({
             reactionList?: unknown;
             items?: unknown;
             values?: unknown;
+            message?: unknown;
+            event?: unknown;
+            update?: unknown;
             data?: unknown;
             payload?: unknown;
           };
@@ -1874,6 +1877,9 @@ export const registerTelegramHandlers = ({
             wrapped.reactionList,
             wrapped.items,
             wrapped.values,
+            wrapped.message,
+            wrapped.event,
+            wrapped.update,
             wrapped.data,
             wrapped.payload,
           ];
