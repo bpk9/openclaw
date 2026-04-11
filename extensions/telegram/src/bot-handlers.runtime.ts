@@ -2014,6 +2014,7 @@ export const registerTelegramHandlers = ({
         reactionAliasRecord["prevValue"],
         reactionAliasRecord["prevValues"],
         reactionAliasRecord.prev,
+        reactionAliasRecord.prior,
         reactionAliasRecord.previous,
         rawReactionArrays?.old_reaction,
         rawReactionArrays?.from_reaction,
@@ -2058,6 +2059,7 @@ export const registerTelegramHandlers = ({
         rawReactionAliasRecord?.["prevValue"],
         rawReactionAliasRecord?.["prevValues"],
         rawReactionAliasRecord?.prev,
+        rawReactionAliasRecord?.prior,
         rawReactionAliasRecord?.previous,
       );
       const newReactionValues = resolveReactionArray(
@@ -2106,6 +2108,7 @@ export const registerTelegramHandlers = ({
         reactionAliasRecord["nextValue"],
         reactionAliasRecord["nextValues"],
         reactionAliasRecord.next,
+        reactionAliasRecord.latest,
         reactionAliasRecord.current,
         rawReactionArrays?.new_reaction,
         rawReactionArrays?.to_reaction,
@@ -2152,6 +2155,7 @@ export const registerTelegramHandlers = ({
         rawReactionAliasRecord?.["nextValue"],
         rawReactionAliasRecord?.["nextValues"],
         rawReactionAliasRecord?.next,
+        rawReactionAliasRecord?.latest,
         rawReactionAliasRecord?.current,
         // Some adapter/runtime paths flatten the current reaction directly onto
         // the message_reaction envelope (for example: { type, emoji }) without
