@@ -1745,6 +1745,8 @@ export const registerTelegramHandlers = ({
         current_reactions?: unknown;
         before?: unknown;
         after?: unknown;
+        previous?: unknown;
+        current?: unknown;
         old?: unknown;
         new?: unknown;
         reaction?: unknown;
@@ -1818,6 +1820,8 @@ export const registerTelegramHandlers = ({
             current_reactions?: unknown;
             before?: unknown;
             after?: unknown;
+            previous?: unknown;
+            current?: unknown;
             old?: unknown;
             new?: unknown;
             reaction?: unknown;
@@ -2010,6 +2014,7 @@ export const registerTelegramHandlers = ({
         reactionAliasRecord["prevValue"],
         reactionAliasRecord["prevValues"],
         reactionAliasRecord.prev,
+        reactionAliasRecord.previous,
         rawReactionArrays?.old_reaction,
         rawReactionArrays?.from_reaction,
         rawReactionArrays?.old_value,
@@ -2053,6 +2058,7 @@ export const registerTelegramHandlers = ({
         rawReactionAliasRecord?.["prevValue"],
         rawReactionAliasRecord?.["prevValues"],
         rawReactionAliasRecord?.prev,
+        rawReactionAliasRecord?.previous,
       );
       const newReactionValues = resolveReactionArray(
         reactionArrays.new_reaction,
@@ -2100,6 +2106,7 @@ export const registerTelegramHandlers = ({
         reactionAliasRecord["nextValue"],
         reactionAliasRecord["nextValues"],
         reactionAliasRecord.next,
+        reactionAliasRecord.current,
         rawReactionArrays?.new_reaction,
         rawReactionArrays?.to_reaction,
         rawReactionArrays?.new_value,
@@ -2145,6 +2152,7 @@ export const registerTelegramHandlers = ({
         rawReactionAliasRecord?.["nextValue"],
         rawReactionAliasRecord?.["nextValues"],
         rawReactionAliasRecord?.next,
+        rawReactionAliasRecord?.current,
         // Some adapter/runtime paths flatten the current reaction directly onto
         // the message_reaction envelope (for example: { type, emoji }) without
         // wrapping it in new_reaction/reaction keys.
