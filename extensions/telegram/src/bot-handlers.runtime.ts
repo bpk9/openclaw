@@ -923,6 +923,20 @@ export const registerTelegramHandlers = ({
               first_name?: string;
               last_name?: string;
             };
+            actor?: {
+              id?: number;
+              username?: string;
+              is_bot?: boolean;
+              first_name?: string;
+              last_name?: string;
+            };
+            sender?: {
+              id?: number;
+              username?: string;
+              is_bot?: boolean;
+              first_name?: string;
+              last_name?: string;
+            };
           }
         | undefined;
       const parseNumericId = (value: unknown): number | undefined => {
@@ -974,8 +988,12 @@ export const registerTelegramHandlers = ({
       const user =
         reactionEnvelope.user ??
         reactionEnvelope.from ??
+        reactionEnvelope.actor ??
+        reactionEnvelope.sender ??
         rawReactionEnvelope?.user ??
         rawReactionEnvelope?.from ??
+        rawReactionEnvelope?.actor ??
+        rawReactionEnvelope?.sender ??
         (() => {
           const flattenedUserId =
             parseNumericId(reactionEnvelope.user_id ?? reactionEnvelope.userId) ??
