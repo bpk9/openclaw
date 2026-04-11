@@ -879,6 +879,13 @@ export const registerTelegramHandlers = ({
           first_name?: string;
           last_name?: string;
         };
+        from?: {
+          id?: number;
+          username?: string;
+          is_bot?: boolean;
+          first_name?: string;
+          last_name?: string;
+        };
       };
       const rawReactionEnvelope = rawReaction as
         | {
@@ -903,6 +910,13 @@ export const registerTelegramHandlers = ({
             is_bot?: boolean;
             isBot?: boolean;
             user?: {
+              id?: number;
+              username?: string;
+              is_bot?: boolean;
+              first_name?: string;
+              last_name?: string;
+            };
+            from?: {
               id?: number;
               username?: string;
               is_bot?: boolean;
@@ -959,7 +973,9 @@ export const registerTelegramHandlers = ({
         parseNumericId(rawReactionEnvelope?.message_id ?? rawReactionEnvelope?.messageId);
       const user =
         reactionEnvelope.user ??
+        reactionEnvelope.from ??
         rawReactionEnvelope?.user ??
+        rawReactionEnvelope?.from ??
         (() => {
           const flattenedUserId =
             parseNumericId(reactionEnvelope.user_id ?? reactionEnvelope.userId) ??
