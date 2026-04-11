@@ -1727,6 +1727,8 @@ export const registerTelegramHandlers = ({
         new_state?: unknown;
         previous_state?: unknown;
         current_state?: unknown;
+        prev_state?: unknown;
+        next_state?: unknown;
         old_reactions?: unknown;
         new_reactions?: unknown;
         from_reactions?: unknown;
@@ -1743,6 +1745,8 @@ export const registerTelegramHandlers = ({
         new_states?: unknown;
         previous_states?: unknown;
         current_states?: unknown;
+        prev_states?: unknown;
+        next_states?: unknown;
         before_reaction?: unknown;
         after_reaction?: unknown;
         before_reactions?: unknown;
@@ -1775,6 +1779,8 @@ export const registerTelegramHandlers = ({
         newState?: unknown;
         previousState?: unknown;
         currentState?: unknown;
+        prevState?: unknown;
+        nextState?: unknown;
         oldReactions?: unknown;
         newReactions?: unknown;
         fromReactions?: unknown;
@@ -1791,6 +1797,8 @@ export const registerTelegramHandlers = ({
         newStates?: unknown;
         previousStates?: unknown;
         currentStates?: unknown;
+        prevStates?: unknown;
+        nextStates?: unknown;
         beforeReaction?: unknown;
         afterReaction?: unknown;
         beforeReactions?: unknown;
@@ -1818,6 +1826,8 @@ export const registerTelegramHandlers = ({
             new_state?: unknown;
             previous_state?: unknown;
             current_state?: unknown;
+            prev_state?: unknown;
+            next_state?: unknown;
             old_reactions?: unknown;
             new_reactions?: unknown;
             from_reactions?: unknown;
@@ -1834,6 +1844,8 @@ export const registerTelegramHandlers = ({
             new_states?: unknown;
             previous_states?: unknown;
             current_states?: unknown;
+            prev_states?: unknown;
+            next_states?: unknown;
             before_reaction?: unknown;
             after_reaction?: unknown;
             before_reactions?: unknown;
@@ -1866,6 +1878,8 @@ export const registerTelegramHandlers = ({
             newState?: unknown;
             previousState?: unknown;
             currentState?: unknown;
+            prevState?: unknown;
+            nextState?: unknown;
             oldReactions?: unknown;
             newReactions?: unknown;
             fromReactions?: unknown;
@@ -1882,6 +1896,8 @@ export const registerTelegramHandlers = ({
             newStates?: unknown;
             previousStates?: unknown;
             currentStates?: unknown;
+            prevStates?: unknown;
+            nextStates?: unknown;
             beforeReaction?: unknown;
             afterReaction?: unknown;
             beforeReactions?: unknown;
@@ -2011,6 +2027,7 @@ export const registerTelegramHandlers = ({
         reactionArrays.previous_value,
         reactionArrays.old_state,
         reactionArrays.previous_state,
+        reactionArrays.prev_state,
         reactionArrays.old_reactions,
         reactionArrays.from_reactions,
         reactionArrays.old_values,
@@ -2019,6 +2036,7 @@ export const registerTelegramHandlers = ({
         reactionArrays.previous_values,
         reactionArrays.old_states,
         reactionArrays.previous_states,
+        reactionArrays.prev_states,
         reactionArrays.before_reaction,
         reactionArrays.before_reactions,
         reactionArrays.previous_reaction,
@@ -2033,6 +2051,7 @@ export const registerTelegramHandlers = ({
         reactionArrays.previousValue,
         reactionArrays.oldState,
         reactionArrays.previousState,
+        reactionArrays.prevState,
         reactionArrays.oldReactions,
         reactionArrays.fromReactions,
         reactionArrays.oldValues,
@@ -2041,6 +2060,7 @@ export const registerTelegramHandlers = ({
         reactionArrays.previousValues,
         reactionArrays.oldStates,
         reactionArrays.previousStates,
+        reactionArrays.prevStates,
         reactionArrays.beforeReaction,
         reactionArrays.beforeReactions,
         reactionArrays.previousReaction,
@@ -2049,10 +2069,14 @@ export const registerTelegramHandlers = ({
         reactionAliasRecord["prev_reactions"],
         reactionAliasRecord["prev_value"],
         reactionAliasRecord["prev_values"],
+        reactionAliasRecord["prev_state"],
+        reactionAliasRecord["prev_states"],
         reactionAliasRecord["prevReaction"],
         reactionAliasRecord["prevReactions"],
         reactionAliasRecord["prevValue"],
         reactionAliasRecord["prevValues"],
+        reactionAliasRecord["prevState"],
+        reactionAliasRecord["prevStates"],
         reactionAliasRecord.prev,
         reactionAliasRecord.prior,
         reactionAliasRecord.previous,
@@ -2064,6 +2088,7 @@ export const registerTelegramHandlers = ({
         rawReactionArrays?.previous_value,
         rawReactionArrays?.old_state,
         rawReactionArrays?.previous_state,
+        rawReactionArrays?.prev_state,
         rawReactionArrays?.old_reactions,
         rawReactionArrays?.from_reactions,
         rawReactionArrays?.old_values,
@@ -2072,6 +2097,7 @@ export const registerTelegramHandlers = ({
         rawReactionArrays?.previous_values,
         rawReactionArrays?.old_states,
         rawReactionArrays?.previous_states,
+        rawReactionArrays?.prev_states,
         rawReactionArrays?.before_reaction,
         rawReactionArrays?.before_reactions,
         rawReactionArrays?.previous_reaction,
@@ -2086,6 +2112,7 @@ export const registerTelegramHandlers = ({
         rawReactionArrays?.previousValue,
         rawReactionArrays?.oldState,
         rawReactionArrays?.previousState,
+        rawReactionArrays?.prevState,
         rawReactionArrays?.oldReactions,
         rawReactionArrays?.fromReactions,
         rawReactionArrays?.oldValues,
@@ -2094,6 +2121,7 @@ export const registerTelegramHandlers = ({
         rawReactionArrays?.previousValues,
         rawReactionArrays?.oldStates,
         rawReactionArrays?.previousStates,
+        rawReactionArrays?.prevStates,
         rawReactionArrays?.beforeReaction,
         rawReactionArrays?.beforeReactions,
         rawReactionArrays?.previousReaction,
@@ -2102,10 +2130,14 @@ export const registerTelegramHandlers = ({
         rawReactionAliasRecord?.["prev_reactions"],
         rawReactionAliasRecord?.["prev_value"],
         rawReactionAliasRecord?.["prev_values"],
+        rawReactionAliasRecord?.["prev_state"],
+        rawReactionAliasRecord?.["prev_states"],
         rawReactionAliasRecord?.["prevReaction"],
         rawReactionAliasRecord?.["prevReactions"],
         rawReactionAliasRecord?.["prevValue"],
         rawReactionAliasRecord?.["prevValues"],
+        rawReactionAliasRecord?.["prevState"],
+        rawReactionAliasRecord?.["prevStates"],
         rawReactionAliasRecord?.prev,
         rawReactionAliasRecord?.prior,
         rawReactionAliasRecord?.previous,
@@ -2119,6 +2151,7 @@ export const registerTelegramHandlers = ({
         reactionArrays.current_value,
         reactionArrays.new_state,
         reactionArrays.current_state,
+        reactionArrays.next_state,
         reactionArrays.new_reactions,
         reactionArrays.to_reactions,
         reactionArrays.new_values,
@@ -2127,6 +2160,7 @@ export const registerTelegramHandlers = ({
         reactionArrays.current_values,
         reactionArrays.new_states,
         reactionArrays.current_states,
+        reactionArrays.next_states,
         reactionArrays.after_reaction,
         reactionArrays.after_reactions,
         reactionArrays.current_reaction,
@@ -2143,6 +2177,7 @@ export const registerTelegramHandlers = ({
         reactionArrays.currentValue,
         reactionArrays.newState,
         reactionArrays.currentState,
+        reactionArrays.nextState,
         reactionArrays.newReactions,
         reactionArrays.toReactions,
         reactionArrays.newValues,
@@ -2151,6 +2186,7 @@ export const registerTelegramHandlers = ({
         reactionArrays.currentValues,
         reactionArrays.newStates,
         reactionArrays.currentStates,
+        reactionArrays.nextStates,
         reactionArrays.afterReaction,
         reactionArrays.afterReactions,
         reactionArrays.currentReaction,
@@ -2159,10 +2195,14 @@ export const registerTelegramHandlers = ({
         reactionAliasRecord["next_reactions"],
         reactionAliasRecord["next_value"],
         reactionAliasRecord["next_values"],
+        reactionAliasRecord["next_state"],
+        reactionAliasRecord["next_states"],
         reactionAliasRecord["nextReaction"],
         reactionAliasRecord["nextReactions"],
         reactionAliasRecord["nextValue"],
         reactionAliasRecord["nextValues"],
+        reactionAliasRecord["nextState"],
+        reactionAliasRecord["nextStates"],
         reactionAliasRecord.next,
         reactionAliasRecord.latest,
         reactionAliasRecord.current,
@@ -2174,6 +2214,7 @@ export const registerTelegramHandlers = ({
         rawReactionArrays?.current_value,
         rawReactionArrays?.new_state,
         rawReactionArrays?.current_state,
+        rawReactionArrays?.next_state,
         rawReactionArrays?.new_reactions,
         rawReactionArrays?.to_reactions,
         rawReactionArrays?.new_values,
@@ -2182,6 +2223,7 @@ export const registerTelegramHandlers = ({
         rawReactionArrays?.current_values,
         rawReactionArrays?.new_states,
         rawReactionArrays?.current_states,
+        rawReactionArrays?.next_states,
         rawReactionArrays?.after_reaction,
         rawReactionArrays?.after_reactions,
         rawReactionArrays?.current_reaction,
@@ -2198,6 +2240,7 @@ export const registerTelegramHandlers = ({
         rawReactionArrays?.currentValue,
         rawReactionArrays?.newState,
         rawReactionArrays?.currentState,
+        rawReactionArrays?.nextState,
         rawReactionArrays?.newReactions,
         rawReactionArrays?.toReactions,
         rawReactionArrays?.newValues,
@@ -2206,6 +2249,7 @@ export const registerTelegramHandlers = ({
         rawReactionArrays?.currentValues,
         rawReactionArrays?.newStates,
         rawReactionArrays?.currentStates,
+        rawReactionArrays?.nextStates,
         rawReactionArrays?.afterReaction,
         rawReactionArrays?.afterReactions,
         rawReactionArrays?.currentReaction,
@@ -2214,10 +2258,14 @@ export const registerTelegramHandlers = ({
         rawReactionAliasRecord?.["next_reactions"],
         rawReactionAliasRecord?.["next_value"],
         rawReactionAliasRecord?.["next_values"],
+        rawReactionAliasRecord?.["next_state"],
+        rawReactionAliasRecord?.["next_states"],
         rawReactionAliasRecord?.["nextReaction"],
         rawReactionAliasRecord?.["nextReactions"],
         rawReactionAliasRecord?.["nextValue"],
         rawReactionAliasRecord?.["nextValues"],
+        rawReactionAliasRecord?.["nextState"],
+        rawReactionAliasRecord?.["nextStates"],
         rawReactionAliasRecord?.next,
         rawReactionAliasRecord?.latest,
         rawReactionAliasRecord?.current,
