@@ -2111,11 +2111,13 @@ export const registerTelegramHandlers = ({
       const reactionDiffAliasRecord =
         asAliasRecord(reactionAliasRecord.diff) ??
         asAliasRecord(reactionAliasRecord.delta) ??
-        asAliasRecord(reactionAliasRecord.change);
+        asAliasRecord(reactionAliasRecord.change) ??
+        asAliasRecord(reactionAliasRecord.changes);
       const rawReactionDiffAliasRecord =
         asAliasRecord(rawReactionAliasRecord?.diff) ??
         asAliasRecord(rawReactionAliasRecord?.delta) ??
-        asAliasRecord(rawReactionAliasRecord?.change);
+        asAliasRecord(rawReactionAliasRecord?.change) ??
+        asAliasRecord(rawReactionAliasRecord?.changes);
       const oldReactionValues = resolveReactionArray(
         reactionDiffAliasRecord?.["old_reaction"],
         reactionDiffAliasRecord?.["from_reaction"],
