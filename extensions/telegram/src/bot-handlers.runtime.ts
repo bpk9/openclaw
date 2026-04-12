@@ -939,6 +939,19 @@ export const registerTelegramHandlers = ({
     return candidates;
   };
   const REACTION_UPDATE_ALIAS_VALUE_MAX_NODES = 64;
+  const coerceIndexedAliasRecordEntries = (candidate: Record<string, unknown>): unknown[] | null => {
+    const entries = Object.entries(candidate);
+    if (entries.length === 0) {
+      return null;
+    }
+    const indexedEntries = entries
+      .filter(([key]) => /^\d+$/.test(key))
+      .sort((a, b) => Number(a[0]) - Number(b[0]));
+    if (indexedEntries.length === 0 || indexedEntries.length !== entries.length) {
+      return null;
+    }
+    return indexedEntries.map(([, value]) => value);
+  };
   const resolveAliasedRawRecord = (value: unknown): Record<string, unknown> | undefined => {
     const queue: unknown[] = [value];
     let visitedNodes = 0;
@@ -951,6 +964,13 @@ export const registerTelegramHandlers = ({
         continue;
       }
       if (isRecord(current)) {
+        const indexedEntries = coerceIndexedAliasRecordEntries(current);
+        if (indexedEntries) {
+          for (const entry of indexedEntries) {
+            queue.push(entry);
+          }
+          continue;
+        }
         return current;
       }
       if (Array.isArray(current)) {
