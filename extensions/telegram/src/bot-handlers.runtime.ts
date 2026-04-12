@@ -834,10 +834,35 @@ export const registerTelegramHandlers = ({
     messageReactionCountsEvent?: unknown;
     message_reaction_counts_events?: unknown;
     messageReactionCountsEvents?: unknown;
+    payload?: unknown;
+    data?: unknown;
+    body?: unknown;
+    event?: unknown;
+    detail?: unknown;
   };
-  const resolveRawReaction = (update: unknown): Record<string, unknown> | undefined => {
-    const typedUpdate = update as TelegramReactionUpdateAliases | undefined;
-    return (typedUpdate?.message_reaction ??
+  const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null;
+  const resolveUpdateCandidates = (update: unknown): TelegramReactionUpdateAliases[] => {
+    if (!isRecord(update)) {
+      return [];
+    }
+    const typedUpdate = update as TelegramReactionUpdateAliases;
+    const nestedCandidates: TelegramReactionUpdateAliases[] = [
+      typedUpdate.payload,
+      typedUpdate.data,
+      typedUpdate.body,
+      typedUpdate.event,
+      typedUpdate.detail,
+    ]
+      .filter(isRecord)
+      .map((candidate) => candidate as TelegramReactionUpdateAliases);
+
+    return [typedUpdate, ...nestedCandidates];
+  };
+  const resolveRawReactionFromCandidate = (
+    typedUpdate: TelegramReactionUpdateAliases,
+  ): Record<string, unknown> | undefined =>
+    (typedUpdate?.message_reaction ??
       typedUpdate?.messageReaction ??
       typedUpdate?.message_reactions ??
       typedUpdate?.messageReactions ??
@@ -861,10 +886,10 @@ export const registerTelegramHandlers = ({
       typedUpdate?.messageReactionsEvent ??
       typedUpdate?.message_reactions_events ??
       typedUpdate?.messageReactionsEvents) as Record<string, unknown> | undefined;
-  };
-  const resolveRawReactionCount = (update: unknown): Record<string, unknown> | undefined => {
-    const typedUpdate = update as TelegramReactionUpdateAliases | undefined;
-    return (typedUpdate?.message_reaction_count ??
+  const resolveRawReactionCountFromCandidate = (
+    typedUpdate: TelegramReactionUpdateAliases,
+  ): Record<string, unknown> | undefined =>
+    (typedUpdate?.message_reaction_count ??
       typedUpdate?.messageReactionCount ??
       typedUpdate?.message_reaction_counts ??
       typedUpdate?.messageReactionCounts ??
@@ -888,6 +913,25 @@ export const registerTelegramHandlers = ({
       typedUpdate?.messageReactionCountsEvent ??
       typedUpdate?.message_reaction_counts_events ??
       typedUpdate?.messageReactionCountsEvents) as Record<string, unknown> | undefined;
+  const resolveRawReaction = (update: unknown): Record<string, unknown> | undefined => {
+    const candidates = resolveUpdateCandidates(update);
+    for (const candidate of candidates) {
+      const resolved = resolveRawReactionFromCandidate(candidate);
+      if (resolved) {
+        return resolved;
+      }
+    }
+    return undefined;
+  };
+  const resolveRawReactionCount = (update: unknown): Record<string, unknown> | undefined => {
+    const candidates = resolveUpdateCandidates(update);
+    for (const candidate of candidates) {
+      const resolved = resolveRawReactionCountFromCandidate(candidate);
+      if (resolved) {
+        return resolved;
+      }
+    }
+    return undefined;
   };
   bot.use(async (ctx, next) => {
     const middlewareDiagAll = process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_POLL === "1";
