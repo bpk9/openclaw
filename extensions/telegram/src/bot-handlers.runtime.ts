@@ -1201,8 +1201,16 @@ export const registerTelegramHandlers = ({
     "afterStates",
     "state_before",
     "state_after",
+    "state_before_reaction",
+    "state_after_reaction",
+    "state_before_reactions",
+    "state_after_reactions",
     "stateBefore",
     "stateAfter",
+    "stateBeforeReaction",
+    "stateAfterReaction",
+    "stateBeforeReactions",
+    "stateAfterReactions",
     "state_previous",
     "state_current",
     "state_old",
@@ -1511,6 +1519,10 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("after_value", ["state_after_value", "stateAfterValue"]);
     assignIfUndefined("before_values", ["state_before_values", "stateBeforeValues"]);
     assignIfUndefined("after_values", ["state_after_values", "stateAfterValues"]);
+    assignIfUndefined("before_reaction", ["state_before_reaction", "stateBeforeReaction"]);
+    assignIfUndefined("after_reaction", ["state_after_reaction", "stateAfterReaction"]);
+    assignIfUndefined("before_reactions", ["state_before_reactions", "stateBeforeReactions"]);
+    assignIfUndefined("after_reactions", ["state_after_reactions", "stateAfterReactions"]);
     assignIfUndefined("beforeState", ["stateBefore"]);
     assignIfUndefined("afterState", ["stateAfter"]);
     assignIfUndefined("beforeStates", ["stateBefores"]);
@@ -1519,6 +1531,10 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("afterValue", ["stateAfterValue"]);
     assignIfUndefined("beforeValues", ["stateBeforeValues"]);
     assignIfUndefined("afterValues", ["stateAfterValues"]);
+    assignIfUndefined("beforeReaction", ["stateBeforeReaction"]);
+    assignIfUndefined("afterReaction", ["stateAfterReaction"]);
+    assignIfUndefined("beforeReactions", ["stateBeforeReactions"]);
+    assignIfUndefined("afterReactions", ["stateAfterReactions"]);
 
     // Direct-envelope payloads can also carry previous/current state aliases.
     // Canonicalize these to the regular previous/current state keys consumed
