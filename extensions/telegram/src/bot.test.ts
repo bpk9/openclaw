@@ -2804,6 +2804,46 @@ describe("createTelegramBot", () => {
     );
   });
 
+  it("enqueues reaction_count fallback from results-wrapped message_reaction_count_event raw update", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction_count") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: {
+        update_id: 500617,
+        results: {
+          message_reaction_count_event: {
+            chat: { id: 4327, type: "private" },
+            message_id: 55617,
+            reactions: [{ type: "emoji", emoji: HEART_EMOJI, total_count: 18 }],
+          },
+        },
+      },
+      messageReactionCount: {
+        reactions: [],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      `Telegram reaction count changed on msg 55617: ${HEART_EMOJI}:18`,
+      expect.objectContaining({
+        contextKey: expect.stringContaining(`telegram:reaction:count:4327:55617:${HEART_EMOJI}:18`),
+      }),
+    );
+  });
+
   it("enqueues reaction_count fallback from message_reaction_count_events raw update", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();
@@ -4717,6 +4757,51 @@ describe("createTelegramBot", () => {
     expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
     expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
       `Telegram reaction added: ${HEART_EMOJI} by Ada on msg 106168`,
+      expect.any(Object),
+    );
+  });
+
+  it("uses results-wrapped message_reaction_event raw update when parsed reaction omits arrays", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: {
+        update_id: 5037169,
+        results: {
+          message_reaction_event: {
+            chat: { id: 1234, type: "private" },
+            message_id: 106169,
+            user: { id: 9, first_name: "Ada" },
+            date: 1736380800,
+            old_reaction: [],
+            new_reaction: [{ type: "emoji", emoji: HEART_EMOJI }],
+          },
+        },
+      },
+      messageReaction: {
+        chat: { id: 1234, type: "private" },
+        message_id: 106169,
+        user: { id: 9, first_name: "Ada" },
+        date: 1736380800,
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      `Telegram reaction added: ${HEART_EMOJI} by Ada on msg 106169`,
       expect.any(Object),
     );
   });

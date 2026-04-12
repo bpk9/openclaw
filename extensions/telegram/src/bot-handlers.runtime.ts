@@ -841,6 +841,8 @@ export const registerTelegramHandlers = ({
     detail?: unknown;
     update?: unknown;
     updates?: unknown;
+    result?: unknown;
+    results?: unknown;
     records?: unknown;
     entries?: unknown;
     items?: unknown;
@@ -855,6 +857,8 @@ export const registerTelegramHandlers = ({
     "detail",
     "update",
     "updates",
+    "result",
+    "results",
     "records",
     "entries",
     "items",
@@ -2169,6 +2173,8 @@ export const registerTelegramHandlers = ({
             content?: unknown;
             data?: unknown;
             payload?: unknown;
+            result?: unknown;
+            results?: unknown;
           };
           const nestedCandidates = [
             wrapped.reactions,
@@ -2184,6 +2190,8 @@ export const registerTelegramHandlers = ({
             wrapped.content,
             wrapped.data,
             wrapped.payload,
+            wrapped.result,
+            wrapped.results,
           ];
           for (const nestedCandidate of nestedCandidates) {
             if (nestedCandidate == null || nestedCandidate === candidate) {
