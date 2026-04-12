@@ -842,6 +842,7 @@ export const registerTelegramHandlers = ({
     update?: unknown;
     updates?: unknown;
     records?: unknown;
+    entries?: unknown;
   };
   const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
@@ -854,6 +855,7 @@ export const registerTelegramHandlers = ({
     "update",
     "updates",
     "records",
+    "entries",
   ] as const;
   const resolveUpdateCandidates = (update: unknown): TelegramReactionUpdateAliases[] => {
     if (!isRecord(update)) {
