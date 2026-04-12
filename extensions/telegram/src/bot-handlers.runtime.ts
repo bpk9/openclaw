@@ -1388,6 +1388,18 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("beforeStates", ["stateBefores"]);
     assignIfUndefined("afterStates", ["stateAfters"]);
 
+    // Similar inverted aliases appear as `state_from`/`state_to` (or camelCase)
+    // for direct-envelope payloads. Canonicalize these to the regular
+    // from/to state keys consumed by downstream diff resolution.
+    assignIfUndefined("from_state", ["state_from", "stateFrom"]);
+    assignIfUndefined("to_state", ["state_to", "stateTo"]);
+    assignIfUndefined("fromState", ["stateFrom"]);
+    assignIfUndefined("toState", ["stateTo"]);
+    assignIfUndefined("from_states", ["state_froms", "stateFroms"]);
+    assignIfUndefined("to_states", ["state_tos", "stateTos"]);
+    assignIfUndefined("fromStates", ["stateFroms"]);
+    assignIfUndefined("toStates", ["stateTos"]);
+
     return normalized;
   };
   const resolveDirectReactionEnvelope = (
