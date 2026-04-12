@@ -879,21 +879,64 @@ export const registerTelegramHandlers = ({
     }
     return null;
   };
+  const coerceIndexedAliasRecordEntries = (candidate: Record<string, unknown>): unknown[] | null => {
+    const entries = Object.entries(candidate);
+    if (entries.length === 0) {
+      return null;
+    }
+    const indexedEntries = entries
+      .filter(([key]) => /^\d+$/.test(key))
+      .sort((a, b) => Number(a[0]) - Number(b[0]));
+    if (indexedEntries.length === 0 || indexedEntries.length !== entries.length) {
+      return null;
+    }
+    return indexedEntries.map(([, value]) => value);
+  };
+  const coerceTupleAliasEntry = (candidate: unknown): [string, unknown] | null => {
+    if (Array.isArray(candidate) && candidate.length === 2 && typeof candidate[0] === "string") {
+      return [candidate[0], candidate[1]];
+    }
+
+    if (isRecord(candidate)) {
+      const indexedEntries = coerceIndexedAliasRecordEntries(candidate);
+      if (indexedEntries && indexedEntries.length === 2 && typeof indexedEntries[0] === "string") {
+        return [indexedEntries[0], indexedEntries[1]];
+      }
+    }
+
+    return null;
+  };
   const coerceTupleAliasRecordEntries = (candidate: unknown[]): Record<string, unknown> | null => {
-    if (candidate.length === 2 && typeof candidate[0] === "string") {
-      return { [candidate[0]]: candidate[1] };
+    const directEntry = coerceTupleAliasEntry(candidate);
+    if (directEntry) {
+      return { [directEntry[0]]: directEntry[1] };
     }
     if (candidate.length === 0) {
       return null;
     }
     const entries: Array<[string, unknown]> = [];
     for (const entry of candidate) {
-      if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== "string") {
+      const tupleEntry = coerceTupleAliasEntry(entry);
+      if (!tupleEntry) {
         return null;
       }
-      entries.push([entry[0], entry[1]]);
+      entries.push(tupleEntry);
     }
     return Object.fromEntries(entries);
+  };
+  const coerceTupleAliasRecord = (candidate: unknown): Record<string, unknown> | null => {
+    if (Array.isArray(candidate)) {
+      return coerceTupleAliasRecordEntries(candidate);
+    }
+
+    if (isRecord(candidate)) {
+      const indexedEntries = coerceIndexedAliasRecordEntries(candidate);
+      if (indexedEntries) {
+        return coerceTupleAliasRecordEntries(indexedEntries);
+      }
+    }
+
+    return null;
   };
   const resolveUpdateCandidates = (update: unknown): TelegramReactionUpdateAliases[] => {
     if (!isRecord(update)) {
@@ -930,6 +973,10 @@ export const registerTelegramHandlers = ({
         }
 
         if (isRecord(nested.value)) {
+          const tupleAliasRecord = coerceTupleAliasRecord(nested.value);
+          if (tupleAliasRecord && !visited.has(tupleAliasRecord)) {
+            queue.push({ record: tupleAliasRecord, depth: nested.depth });
+          }
           if (!visited.has(nested.value)) {
             queue.push({ record: nested.value, depth: nested.depth });
           }
@@ -937,7 +984,7 @@ export const registerTelegramHandlers = ({
         }
 
         if (Array.isArray(nested.value)) {
-          const tupleAliasRecord = coerceTupleAliasRecordEntries(nested.value);
+          const tupleAliasRecord = coerceTupleAliasRecord(nested.value);
           if (tupleAliasRecord && !visited.has(tupleAliasRecord)) {
             queue.push({ record: tupleAliasRecord, depth: nested.depth });
           }
@@ -959,19 +1006,6 @@ export const registerTelegramHandlers = ({
     return candidates;
   };
   const REACTION_UPDATE_ALIAS_VALUE_MAX_NODES = 64;
-  const coerceIndexedAliasRecordEntries = (candidate: Record<string, unknown>): unknown[] | null => {
-    const entries = Object.entries(candidate);
-    if (entries.length === 0) {
-      return null;
-    }
-    const indexedEntries = entries
-      .filter(([key]) => /^\d+$/.test(key))
-      .sort((a, b) => Number(a[0]) - Number(b[0]));
-    if (indexedEntries.length === 0 || indexedEntries.length !== entries.length) {
-      return null;
-    }
-    return indexedEntries.map(([, value]) => value);
-  };
   const resolveAliasedRawRecord = (value: unknown): Record<string, unknown> | undefined => {
     const queue: unknown[] = [value];
     let visitedNodes = 0;
