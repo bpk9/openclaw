@@ -938,60 +938,105 @@ export const registerTelegramHandlers = ({
 
     return candidates;
   };
+  const REACTION_UPDATE_ALIAS_VALUE_MAX_NODES = 64;
+  const resolveAliasedRawRecord = (value: unknown): Record<string, unknown> | undefined => {
+    const queue: unknown[] = [value];
+    let visitedNodes = 0;
+
+    while (queue.length > 0 && visitedNodes < REACTION_UPDATE_ALIAS_VALUE_MAX_NODES) {
+      const current = queue.shift();
+      visitedNodes += 1;
+
+      if (current == null) {
+        continue;
+      }
+      if (isRecord(current)) {
+        return current;
+      }
+      if (Array.isArray(current)) {
+        for (const entry of current) {
+          queue.push(entry);
+        }
+        continue;
+      }
+
+      const parsed = parseJsonUpdateCandidate(current);
+      if (parsed != null) {
+        queue.push(parsed);
+      }
+    }
+
+    return undefined;
+  };
+  const resolveFirstAliasedRawRecord = (
+    ...values: unknown[]
+  ): Record<string, unknown> | undefined => {
+    for (const value of values) {
+      const resolved = resolveAliasedRawRecord(value);
+      if (resolved) {
+        return resolved;
+      }
+    }
+    return undefined;
+  };
   const resolveRawReactionFromCandidate = (
     typedUpdate: TelegramReactionUpdateAliases,
   ): Record<string, unknown> | undefined =>
-    (typedUpdate?.message_reaction ??
-      typedUpdate?.messageReaction ??
-      typedUpdate?.message_reactions ??
-      typedUpdate?.messageReactions ??
-      typedUpdate?.message_reaction_update ??
-      typedUpdate?.messageReactionUpdate ??
-      typedUpdate?.message_reactions_update ??
-      typedUpdate?.messageReactionsUpdate ??
-      typedUpdate?.message_reaction_updated ??
-      typedUpdate?.messageReactionUpdated ??
-      typedUpdate?.message_reactions_updated ??
-      typedUpdate?.messageReactionsUpdated ??
-      typedUpdate?.message_reaction_changed ??
-      typedUpdate?.messageReactionChanged ??
-      typedUpdate?.message_reactions_changed ??
-      typedUpdate?.messageReactionsChanged ??
-      typedUpdate?.message_reaction_event ??
-      typedUpdate?.messageReactionEvent ??
-      typedUpdate?.message_reaction_events ??
-      typedUpdate?.messageReactionEvents ??
-      typedUpdate?.message_reactions_event ??
-      typedUpdate?.messageReactionsEvent ??
-      typedUpdate?.message_reactions_events ??
-      typedUpdate?.messageReactionsEvents) as Record<string, unknown> | undefined;
+    resolveFirstAliasedRawRecord(
+      typedUpdate?.message_reaction,
+      typedUpdate?.messageReaction,
+      typedUpdate?.message_reactions,
+      typedUpdate?.messageReactions,
+      typedUpdate?.message_reaction_update,
+      typedUpdate?.messageReactionUpdate,
+      typedUpdate?.message_reactions_update,
+      typedUpdate?.messageReactionsUpdate,
+      typedUpdate?.message_reaction_updated,
+      typedUpdate?.messageReactionUpdated,
+      typedUpdate?.message_reactions_updated,
+      typedUpdate?.messageReactionsUpdated,
+      typedUpdate?.message_reaction_changed,
+      typedUpdate?.messageReactionChanged,
+      typedUpdate?.message_reactions_changed,
+      typedUpdate?.messageReactionsChanged,
+      typedUpdate?.message_reaction_event,
+      typedUpdate?.messageReactionEvent,
+      typedUpdate?.message_reaction_events,
+      typedUpdate?.messageReactionEvents,
+      typedUpdate?.message_reactions_event,
+      typedUpdate?.messageReactionsEvent,
+      typedUpdate?.message_reactions_events,
+      typedUpdate?.messageReactionsEvents,
+    );
   const resolveRawReactionCountFromCandidate = (
     typedUpdate: TelegramReactionUpdateAliases,
   ): Record<string, unknown> | undefined =>
-    (typedUpdate?.message_reaction_count ??
-      typedUpdate?.messageReactionCount ??
-      typedUpdate?.message_reaction_counts ??
-      typedUpdate?.messageReactionCounts ??
-      typedUpdate?.message_reaction_count_update ??
-      typedUpdate?.messageReactionCountUpdate ??
-      typedUpdate?.message_reaction_counts_update ??
-      typedUpdate?.messageReactionCountsUpdate ??
-      typedUpdate?.message_reaction_count_updated ??
-      typedUpdate?.messageReactionCountUpdated ??
-      typedUpdate?.message_reaction_counts_updated ??
-      typedUpdate?.messageReactionCountsUpdated ??
-      typedUpdate?.message_reaction_count_changed ??
-      typedUpdate?.messageReactionCountChanged ??
-      typedUpdate?.message_reaction_counts_changed ??
-      typedUpdate?.messageReactionCountsChanged ??
-      typedUpdate?.message_reaction_count_event ??
-      typedUpdate?.messageReactionCountEvent ??
-      typedUpdate?.message_reaction_count_events ??
-      typedUpdate?.messageReactionCountEvents ??
-      typedUpdate?.message_reaction_counts_event ??
-      typedUpdate?.messageReactionCountsEvent ??
-      typedUpdate?.message_reaction_counts_events ??
-      typedUpdate?.messageReactionCountsEvents) as Record<string, unknown> | undefined;
+    resolveFirstAliasedRawRecord(
+      typedUpdate?.message_reaction_count,
+      typedUpdate?.messageReactionCount,
+      typedUpdate?.message_reaction_counts,
+      typedUpdate?.messageReactionCounts,
+      typedUpdate?.message_reaction_count_update,
+      typedUpdate?.messageReactionCountUpdate,
+      typedUpdate?.message_reaction_counts_update,
+      typedUpdate?.messageReactionCountsUpdate,
+      typedUpdate?.message_reaction_count_updated,
+      typedUpdate?.messageReactionCountUpdated,
+      typedUpdate?.message_reaction_counts_updated,
+      typedUpdate?.messageReactionCountsUpdated,
+      typedUpdate?.message_reaction_count_changed,
+      typedUpdate?.messageReactionCountChanged,
+      typedUpdate?.message_reaction_counts_changed,
+      typedUpdate?.messageReactionCountsChanged,
+      typedUpdate?.message_reaction_count_event,
+      typedUpdate?.messageReactionCountEvent,
+      typedUpdate?.message_reaction_count_events,
+      typedUpdate?.messageReactionCountEvents,
+      typedUpdate?.message_reaction_counts_event,
+      typedUpdate?.messageReactionCountsEvent,
+      typedUpdate?.message_reaction_counts_events,
+      typedUpdate?.messageReactionCountsEvents,
+    );
   const resolveRawReaction = (update: unknown): Record<string, unknown> | undefined => {
     const candidates = resolveUpdateCandidates(update);
     for (const candidate of candidates) {
