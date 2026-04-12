@@ -1233,6 +1233,10 @@ export const registerTelegramHandlers = ({
     "state_latest_reaction",
     "state_prior_reactions",
     "state_latest_reactions",
+    "state_pre_reaction",
+    "state_post_reaction",
+    "state_pre_reactions",
+    "state_post_reactions",
     "state_prev_reaction",
     "state_next_reaction",
     "state_prev_reactions",
@@ -1271,6 +1275,10 @@ export const registerTelegramHandlers = ({
     "stateLatestReaction",
     "statePriorReactions",
     "stateLatestReactions",
+    "statePreReaction",
+    "statePostReaction",
+    "statePreReactions",
+    "statePostReactions",
     "statePrevReaction",
     "stateNextReaction",
     "statePrevReactions",
@@ -1529,6 +1537,10 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("current_reaction", ["state_latest_reaction", "stateLatestReaction"]);
     assignIfUndefined("previous_reactions", ["state_prior_reactions", "statePriorReactions"]);
     assignIfUndefined("current_reactions", ["state_latest_reactions", "stateLatestReactions"]);
+    assignIfUndefined("previous_reaction", ["state_pre_reaction", "statePreReaction"]);
+    assignIfUndefined("current_reaction", ["state_post_reaction", "statePostReaction"]);
+    assignIfUndefined("previous_reactions", ["state_pre_reactions", "statePreReactions"]);
+    assignIfUndefined("current_reactions", ["state_post_reactions", "statePostReactions"]);
     assignIfUndefined("previous_reaction", ["state_prev_reaction", "statePrevReaction"]);
     assignIfUndefined("current_reaction", ["state_next_reaction", "stateNextReaction"]);
     assignIfUndefined("previous_reactions", ["state_prev_reactions", "statePrevReactions"]);
@@ -1575,6 +1587,10 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("currentReaction", ["stateLatestReaction"]);
     assignIfUndefined("previousReactions", ["statePriorReactions"]);
     assignIfUndefined("currentReactions", ["stateLatestReactions"]);
+    assignIfUndefined("previousReaction", ["statePreReaction"]);
+    assignIfUndefined("currentReaction", ["statePostReaction"]);
+    assignIfUndefined("previousReactions", ["statePreReactions"]);
+    assignIfUndefined("currentReactions", ["statePostReactions"]);
     assignIfUndefined("previousReaction", ["statePrevReaction"]);
     assignIfUndefined("currentReaction", ["stateNextReaction"]);
     assignIfUndefined("previousReactions", ["statePrevReactions"]);
