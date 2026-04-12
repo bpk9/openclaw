@@ -1359,13 +1359,46 @@ export const registerTelegramHandlers = ({
       candidate.chat !== undefined || candidate.chat_id !== undefined || candidate.chatId !== undefined;
     return hasMessageId && hasChat;
   };
+  const normalizeDirectReactionEnvelope = (
+    candidate: Record<string, unknown>,
+  ): Record<string, unknown> => {
+    const normalized = { ...candidate };
+    const assignIfUndefined = (targetKey: string, sourceKeys: readonly string[]) => {
+      if (normalized[targetKey] !== undefined) {
+        return;
+      }
+      for (const sourceKey of sourceKeys) {
+        const value = normalized[sourceKey];
+        if (value !== undefined) {
+          normalized[targetKey] = value;
+          return;
+        }
+      }
+    };
+
+    // Some adapter/runtime paths use inverted state aliases (`state_before`/`state_after`)
+    // even for direct-envelope reaction updates. Map them onto the canonical
+    // before/after state keys used by downstream diff resolution.
+    assignIfUndefined("before_state", ["state_before", "stateBefore"]);
+    assignIfUndefined("after_state", ["state_after", "stateAfter"]);
+    assignIfUndefined("before_states", ["state_befores", "stateBefores"]);
+    assignIfUndefined("after_states", ["state_afters", "stateAfters"]);
+    assignIfUndefined("beforeState", ["stateBefore"]);
+    assignIfUndefined("afterState", ["stateAfter"]);
+    assignIfUndefined("beforeStates", ["stateBefores"]);
+    assignIfUndefined("afterStates", ["stateAfters"]);
+
+    return normalized;
+  };
   const resolveDirectReactionEnvelope = (
     candidate: Record<string, unknown>,
   ): Record<string, unknown> | undefined => {
     if (!hasCandidateMessageEnvelope(candidate)) {
       return undefined;
     }
-    return hasAnyDefinedKey(candidate, DIRECT_REACTION_ARRAY_KEYS) ? candidate : undefined;
+    return hasAnyDefinedKey(candidate, DIRECT_REACTION_ARRAY_KEYS)
+      ? normalizeDirectReactionEnvelope(candidate)
+      : undefined;
   };
   const resolveDirectReactionCountEnvelope = (
     candidate: Record<string, unknown>,
