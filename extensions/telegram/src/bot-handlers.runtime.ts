@@ -1255,6 +1255,14 @@ export const registerTelegramHandlers = ({
     "to_state",
     "state_from",
     "state_to",
+    "state_from_value",
+    "state_to_value",
+    "state_from_values",
+    "state_to_values",
+    "stateFromValue",
+    "stateToValue",
+    "stateFromValues",
+    "stateToValues",
     "from_states",
     "to_states",
     "fromState",
@@ -1489,8 +1497,16 @@ export const registerTelegramHandlers = ({
     // from/to state keys consumed by downstream diff resolution.
     assignIfUndefined("from_state", ["state_from", "stateFrom"]);
     assignIfUndefined("to_state", ["state_to", "stateTo"]);
+    assignIfUndefined("from_value", ["state_from_value", "stateFromValue"]);
+    assignIfUndefined("to_value", ["state_to_value", "stateToValue"]);
+    assignIfUndefined("from_values", ["state_from_values", "stateFromValues"]);
+    assignIfUndefined("to_values", ["state_to_values", "stateToValues"]);
     assignIfUndefined("fromState", ["stateFrom"]);
     assignIfUndefined("toState", ["stateTo"]);
+    assignIfUndefined("fromValue", ["stateFromValue"]);
+    assignIfUndefined("toValue", ["stateToValue"]);
+    assignIfUndefined("fromValues", ["stateFromValues"]);
+    assignIfUndefined("toValues", ["stateToValues"]);
     assignIfUndefined("from_states", ["state_froms", "stateFroms"]);
     assignIfUndefined("to_states", ["state_tos", "stateTos"]);
     assignIfUndefined("fromStates", ["stateFroms"]);
