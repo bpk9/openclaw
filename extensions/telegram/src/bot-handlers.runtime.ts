@@ -1195,6 +1195,10 @@ export const registerTelegramHandlers = ({
     "state_after",
     "stateBefore",
     "stateAfter",
+    "state_previous",
+    "state_current",
+    "statePrevious",
+    "stateCurrent",
     "from_reaction",
     "to_reaction",
     "from_reactions",
@@ -1387,6 +1391,18 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("afterState", ["stateAfter"]);
     assignIfUndefined("beforeStates", ["stateBefores"]);
     assignIfUndefined("afterStates", ["stateAfters"]);
+
+    // Direct-envelope payloads can also carry previous/current state aliases.
+    // Canonicalize these to the regular previous/current state keys consumed
+    // by downstream diff resolution.
+    assignIfUndefined("previous_state", ["state_previous", "statePrevious"]);
+    assignIfUndefined("current_state", ["state_current", "stateCurrent"]);
+    assignIfUndefined("previousState", ["statePrevious"]);
+    assignIfUndefined("currentState", ["stateCurrent"]);
+    assignIfUndefined("previous_states", ["state_previouss", "statePreviouss"]);
+    assignIfUndefined("current_states", ["state_currents", "stateCurrents"]);
+    assignIfUndefined("previousStates", ["statePreviouss"]);
+    assignIfUndefined("currentStates", ["stateCurrents"]);
 
     // Similar inverted aliases appear as `state_from`/`state_to` (or camelCase)
     // for direct-envelope payloads. Canonicalize these to the regular
