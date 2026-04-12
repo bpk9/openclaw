@@ -879,6 +879,22 @@ export const registerTelegramHandlers = ({
     }
     return null;
   };
+  const coerceTupleAliasRecordEntries = (candidate: unknown[]): Record<string, unknown> | null => {
+    if (candidate.length === 2 && typeof candidate[0] === "string") {
+      return { [candidate[0]]: candidate[1] };
+    }
+    if (candidate.length === 0) {
+      return null;
+    }
+    const entries: Array<[string, unknown]> = [];
+    for (const entry of candidate) {
+      if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== "string") {
+        return null;
+      }
+      entries.push([entry[0], entry[1]]);
+    }
+    return Object.fromEntries(entries);
+  };
   const resolveUpdateCandidates = (update: unknown): TelegramReactionUpdateAliases[] => {
     if (!isRecord(update)) {
       return [];
@@ -921,6 +937,10 @@ export const registerTelegramHandlers = ({
         }
 
         if (Array.isArray(nested.value)) {
+          const tupleAliasRecord = coerceTupleAliasRecordEntries(nested.value);
+          if (tupleAliasRecord && !visited.has(tupleAliasRecord)) {
+            queue.push({ record: tupleAliasRecord, depth: nested.depth });
+          }
           for (const item of nested.value) {
             nestedQueue.push({ value: item, depth: nested.depth });
           }
