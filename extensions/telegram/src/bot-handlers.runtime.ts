@@ -877,17 +877,25 @@ export const registerTelegramHandlers = ({
         continue;
       }
 
-      for (const nested of Object.values(typedCurrent)) {
-        if (isRecord(nested) && !visited.has(nested)) {
-          queue.push({ record: nested, depth: current.depth + 1 });
+      const nestedQueue: Array<{ value: unknown; depth: number }> = Object.values(typedCurrent).map(
+        (value) => ({ value, depth: current.depth + 1 }),
+      );
+      while (nestedQueue.length > 0) {
+        const nested = nestedQueue.shift();
+        if (!nested || nested.depth > REACTION_UPDATE_CANDIDATE_MAX_DEPTH) {
           continue;
         }
 
-        if (Array.isArray(nested)) {
-          for (const item of nested) {
-            if (isRecord(item) && !visited.has(item)) {
-              queue.push({ record: item, depth: current.depth + 1 });
-            }
+        if (isRecord(nested.value)) {
+          if (!visited.has(nested.value)) {
+            queue.push({ record: nested.value, depth: nested.depth });
+          }
+          continue;
+        }
+
+        if (Array.isArray(nested.value)) {
+          for (const item of nested.value) {
+            nestedQueue.push({ value: item, depth: nested.depth });
           }
         }
       }
