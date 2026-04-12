@@ -1132,7 +1132,14 @@ export const registerTelegramHandlers = ({
     "reaction",
     "reactions",
   ] as const;
-  const DIRECT_REACTION_COUNT_KEYS = ["reaction", "reactions"] as const;
+  const DIRECT_REACTION_COUNT_KEYS = [
+    "reaction",
+    "reactions",
+    "reaction_count",
+    "reaction_counts",
+    "reactionCount",
+    "reactionCounts",
+  ] as const;
   const hasAnyDefinedKey = (
     candidate: Record<string, unknown>,
     keys: readonly string[],
@@ -4070,6 +4077,10 @@ export const registerTelegramHandlers = ({
         messageId?: number;
         reactions?: unknown;
         reaction?: unknown;
+        reaction_count?: unknown;
+        reaction_counts?: unknown;
+        reactionCount?: unknown;
+        reactionCounts?: unknown;
       };
       const rawReactionCountEnvelope = rawReactionCount as
         | {
@@ -4086,6 +4097,10 @@ export const registerTelegramHandlers = ({
             messageId?: number;
             reactions?: unknown;
             reaction?: unknown;
+            reaction_count?: unknown;
+            reaction_counts?: unknown;
+            reactionCount?: unknown;
+            reactionCounts?: unknown;
           }
         | undefined;
       const parseNumericId = (value: unknown): number | undefined => {
@@ -4252,8 +4267,16 @@ export const registerTelegramHandlers = ({
       const reactionEntries = resolveReactionEntries(
         reactionCountEnvelope.reactions,
         reactionCountEnvelope.reaction,
+        reactionCountEnvelope.reaction_count,
+        reactionCountEnvelope.reaction_counts,
+        reactionCountEnvelope.reactionCount,
+        reactionCountEnvelope.reactionCounts,
         rawReactionCountEnvelope?.reactions,
         rawReactionCountEnvelope?.reaction,
+        rawReactionCountEnvelope?.reaction_count,
+        rawReactionCountEnvelope?.reaction_counts,
+        rawReactionCountEnvelope?.reactionCount,
+        rawReactionCountEnvelope?.reactionCounts,
       );
       const parseReactionCount = (value: unknown): number => {
         if (typeof value === "number" && Number.isFinite(value)) {
