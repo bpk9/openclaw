@@ -867,6 +867,15 @@ export const registerTelegramHandlers = ({
         const nested = typedCurrent[key];
         if (isRecord(nested) && !visited.has(nested)) {
           queue.push(nested);
+          continue;
+        }
+
+        if (Array.isArray(nested)) {
+          for (const item of nested) {
+            if (isRecord(item) && !visited.has(item)) {
+              queue.push(item);
+            }
+          }
         }
       }
     }
