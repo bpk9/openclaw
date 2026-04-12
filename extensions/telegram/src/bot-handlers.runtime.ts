@@ -1122,16 +1122,66 @@ export const registerTelegramHandlers = ({
     }
     return values;
   };
+  const DIRECT_REACTION_ARRAY_KEYS = [
+    "old_reaction",
+    "new_reaction",
+    "oldReaction",
+    "newReaction",
+    "old",
+    "new",
+    "reaction",
+    "reactions",
+  ] as const;
+  const DIRECT_REACTION_COUNT_KEYS = ["reaction", "reactions"] as const;
+  const hasAnyDefinedKey = (
+    candidate: Record<string, unknown>,
+    keys: readonly string[],
+  ): boolean => {
+    for (const key of keys) {
+      if (candidate[key] !== undefined) {
+        return true;
+      }
+    }
+    return false;
+  };
+  const hasCandidateMessageEnvelope = (candidate: Record<string, unknown>): boolean => {
+    const hasMessageId = candidate.message_id !== undefined || candidate.messageId !== undefined;
+    const hasChat =
+      candidate.chat !== undefined || candidate.chat_id !== undefined || candidate.chatId !== undefined;
+    return hasMessageId && hasChat;
+  };
+  const resolveDirectReactionEnvelope = (
+    candidate: Record<string, unknown>,
+  ): Record<string, unknown> | undefined => {
+    if (!hasCandidateMessageEnvelope(candidate)) {
+      return undefined;
+    }
+    return hasAnyDefinedKey(candidate, DIRECT_REACTION_ARRAY_KEYS) ? candidate : undefined;
+  };
+  const resolveDirectReactionCountEnvelope = (
+    candidate: Record<string, unknown>,
+  ): Record<string, unknown> | undefined => {
+    if (!hasCandidateMessageEnvelope(candidate)) {
+      return undefined;
+    }
+    return hasAnyDefinedKey(candidate, DIRECT_REACTION_COUNT_KEYS) ? candidate : undefined;
+  };
   const resolveRawReactionFromCandidate = (
     typedUpdate: TelegramReactionUpdateAliases,
-  ): Record<string, unknown> | undefined =>
-    resolveFirstAliasedRawRecord(...resolveRawAliasValues(typedUpdate, REACTION_RAW_UPDATE_KEYS));
+  ): Record<string, unknown> | undefined => {
+    const fromAlias = resolveFirstAliasedRawRecord(
+      ...resolveRawAliasValues(typedUpdate, REACTION_RAW_UPDATE_KEYS),
+    );
+    return fromAlias ?? resolveDirectReactionEnvelope(typedUpdate);
+  };
   const resolveRawReactionCountFromCandidate = (
     typedUpdate: TelegramReactionUpdateAliases,
-  ): Record<string, unknown> | undefined =>
-    resolveFirstAliasedRawRecord(
+  ): Record<string, unknown> | undefined => {
+    const fromAlias = resolveFirstAliasedRawRecord(
       ...resolveRawAliasValues(typedUpdate, REACTION_COUNT_RAW_UPDATE_KEYS),
     );
+    return fromAlias ?? resolveDirectReactionCountEnvelope(typedUpdate);
+  };
   const resolveRawReaction = (update: unknown): Record<string, unknown> | undefined => {
     const candidates = resolveUpdateCandidates(update);
     for (const candidate of candidates) {
