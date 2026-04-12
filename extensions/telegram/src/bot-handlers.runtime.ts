@@ -1053,63 +1053,84 @@ export const registerTelegramHandlers = ({
     }
     return undefined;
   };
+  const REACTION_RAW_UPDATE_KEYS = [
+    "message_reaction",
+    "messageReaction",
+    "message_reactions",
+    "messageReactions",
+    "message_reaction_update",
+    "messageReactionUpdate",
+    "message_reactions_update",
+    "messageReactionsUpdate",
+    "message_reaction_updated",
+    "messageReactionUpdated",
+    "message_reactions_updated",
+    "messageReactionsUpdated",
+    "message_reaction_changed",
+    "messageReactionChanged",
+    "message_reactions_changed",
+    "messageReactionsChanged",
+    "message_reaction_event",
+    "messageReactionEvent",
+    "message_reaction_events",
+    "messageReactionEvents",
+    "message_reactions_event",
+    "messageReactionsEvent",
+    "message_reactions_events",
+    "messageReactionsEvents",
+  ] as const;
+  const REACTION_COUNT_RAW_UPDATE_KEYS = [
+    "message_reaction_count",
+    "messageReactionCount",
+    "message_reaction_counts",
+    "messageReactionCounts",
+    "message_reaction_count_update",
+    "messageReactionCountUpdate",
+    "message_reaction_counts_update",
+    "messageReactionCountsUpdate",
+    "message_reaction_count_updated",
+    "messageReactionCountUpdated",
+    "message_reaction_counts_updated",
+    "messageReactionCountsUpdated",
+    "message_reaction_count_changed",
+    "messageReactionCountChanged",
+    "message_reaction_counts_changed",
+    "messageReactionCountsChanged",
+    "message_reaction_count_event",
+    "messageReactionCountEvent",
+    "message_reaction_count_events",
+    "messageReactionCountEvents",
+    "message_reaction_counts_event",
+    "messageReactionCountsEvent",
+    "message_reaction_counts_events",
+    "messageReactionCountsEvents",
+  ] as const;
+  const resolveRawAliasValues = (
+    typedUpdate: TelegramReactionUpdateAliases,
+    keys: readonly string[],
+  ): unknown[] => {
+    const values: unknown[] = [];
+    for (const key of keys) {
+      values.push(typedUpdate[key]);
+      if (key.length === 0) {
+        continue;
+      }
+      const pascalKey = `${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+      if (pascalKey !== key) {
+        values.push(typedUpdate[pascalKey]);
+      }
+    }
+    return values;
+  };
   const resolveRawReactionFromCandidate = (
     typedUpdate: TelegramReactionUpdateAliases,
   ): Record<string, unknown> | undefined =>
-    resolveFirstAliasedRawRecord(
-      typedUpdate?.message_reaction,
-      typedUpdate?.messageReaction,
-      typedUpdate?.message_reactions,
-      typedUpdate?.messageReactions,
-      typedUpdate?.message_reaction_update,
-      typedUpdate?.messageReactionUpdate,
-      typedUpdate?.message_reactions_update,
-      typedUpdate?.messageReactionsUpdate,
-      typedUpdate?.message_reaction_updated,
-      typedUpdate?.messageReactionUpdated,
-      typedUpdate?.message_reactions_updated,
-      typedUpdate?.messageReactionsUpdated,
-      typedUpdate?.message_reaction_changed,
-      typedUpdate?.messageReactionChanged,
-      typedUpdate?.message_reactions_changed,
-      typedUpdate?.messageReactionsChanged,
-      typedUpdate?.message_reaction_event,
-      typedUpdate?.messageReactionEvent,
-      typedUpdate?.message_reaction_events,
-      typedUpdate?.messageReactionEvents,
-      typedUpdate?.message_reactions_event,
-      typedUpdate?.messageReactionsEvent,
-      typedUpdate?.message_reactions_events,
-      typedUpdate?.messageReactionsEvents,
-    );
+    resolveFirstAliasedRawRecord(...resolveRawAliasValues(typedUpdate, REACTION_RAW_UPDATE_KEYS));
   const resolveRawReactionCountFromCandidate = (
     typedUpdate: TelegramReactionUpdateAliases,
   ): Record<string, unknown> | undefined =>
     resolveFirstAliasedRawRecord(
-      typedUpdate?.message_reaction_count,
-      typedUpdate?.messageReactionCount,
-      typedUpdate?.message_reaction_counts,
-      typedUpdate?.messageReactionCounts,
-      typedUpdate?.message_reaction_count_update,
-      typedUpdate?.messageReactionCountUpdate,
-      typedUpdate?.message_reaction_counts_update,
-      typedUpdate?.messageReactionCountsUpdate,
-      typedUpdate?.message_reaction_count_updated,
-      typedUpdate?.messageReactionCountUpdated,
-      typedUpdate?.message_reaction_counts_updated,
-      typedUpdate?.messageReactionCountsUpdated,
-      typedUpdate?.message_reaction_count_changed,
-      typedUpdate?.messageReactionCountChanged,
-      typedUpdate?.message_reaction_counts_changed,
-      typedUpdate?.messageReactionCountsChanged,
-      typedUpdate?.message_reaction_count_event,
-      typedUpdate?.messageReactionCountEvent,
-      typedUpdate?.message_reaction_count_events,
-      typedUpdate?.messageReactionCountEvents,
-      typedUpdate?.message_reaction_counts_event,
-      typedUpdate?.messageReactionCountsEvent,
-      typedUpdate?.message_reaction_counts_events,
-      typedUpdate?.messageReactionCountsEvents,
+      ...resolveRawAliasValues(typedUpdate, REACTION_COUNT_RAW_UPDATE_KEYS),
     );
   const resolveRawReaction = (update: unknown): Record<string, unknown> | undefined => {
     const candidates = resolveUpdateCandidates(update);
