@@ -1125,8 +1125,12 @@ export const registerTelegramHandlers = ({
   const DIRECT_REACTION_ARRAY_KEYS = [
     "old_reaction",
     "new_reaction",
+    "old_reactions",
+    "new_reactions",
     "oldReaction",
     "newReaction",
+    "oldReactions",
+    "newReactions",
     "old",
     "new",
     "reaction",
