@@ -1199,6 +1199,8 @@ export const registerTelegramHandlers = ({
     "to_value",
     "from_values",
     "to_values",
+    "source",
+    "target",
     "source_reaction",
     "target_reaction",
     "source_reactions",
