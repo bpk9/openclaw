@@ -852,6 +852,33 @@ export const registerTelegramHandlers = ({
     typeof value === "object" && value !== null;
   const REACTION_UPDATE_CANDIDATE_MAX_DEPTH = 6;
   const REACTION_UPDATE_CANDIDATE_MAX_RECORDS = 256;
+  const parseJsonUpdateCandidate = (value: unknown): unknown | null => {
+    if (typeof value !== "string") {
+      return null;
+    }
+    let candidate = value.trim();
+    if (candidate.length === 0) {
+      return null;
+    }
+    for (let depth = 0; depth < 3; depth += 1) {
+      const isJsonLike =
+        candidate.startsWith("{") || candidate.startsWith("[") || candidate.startsWith('"');
+      if (!isJsonLike) {
+        return null;
+      }
+      try {
+        const parsed = JSON.parse(candidate) as unknown;
+        if (typeof parsed === "string") {
+          candidate = parsed.trim();
+          continue;
+        }
+        return parsed;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
   const resolveUpdateCandidates = (update: unknown): TelegramReactionUpdateAliases[] => {
     if (!isRecord(update)) {
       return [];
@@ -896,6 +923,14 @@ export const registerTelegramHandlers = ({
         if (Array.isArray(nested.value)) {
           for (const item of nested.value) {
             nestedQueue.push({ value: item, depth: nested.depth });
+          }
+          continue;
+        }
+
+        if (typeof nested.value === "string") {
+          const parsed = parseJsonUpdateCandidate(nested.value);
+          if (parsed != null) {
+            nestedQueue.push({ value: parsed, depth: nested.depth });
           }
         }
       }
