@@ -843,23 +843,35 @@ export const registerTelegramHandlers = ({
   };
   const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
+  const reactionUpdateWrapperKeys = ["payload", "data", "body", "event", "detail", "update"] as const;
   const resolveUpdateCandidates = (update: unknown): TelegramReactionUpdateAliases[] => {
     if (!isRecord(update)) {
       return [];
     }
-    const typedUpdate = update as TelegramReactionUpdateAliases;
-    const nestedCandidates: TelegramReactionUpdateAliases[] = [
-      typedUpdate.payload,
-      typedUpdate.data,
-      typedUpdate.body,
-      typedUpdate.event,
-      typedUpdate.detail,
-      typedUpdate.update,
-    ]
-      .filter(isRecord)
-      .map((candidate) => candidate as TelegramReactionUpdateAliases);
 
-    return [typedUpdate, ...nestedCandidates];
+    const visited = new Set<Record<string, unknown>>();
+    const queue: Record<string, unknown>[] = [update as Record<string, unknown>];
+    const candidates: TelegramReactionUpdateAliases[] = [];
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (!current || visited.has(current)) {
+        continue;
+      }
+
+      visited.add(current);
+      const typedCurrent = current as TelegramReactionUpdateAliases;
+      candidates.push(typedCurrent);
+
+      for (const key of reactionUpdateWrapperKeys) {
+        const nested = typedCurrent[key];
+        if (isRecord(nested) && !visited.has(nested)) {
+          queue.push(nested);
+        }
+      }
+    }
+
+    return candidates;
   };
   const resolveRawReactionFromCandidate = (
     typedUpdate: TelegramReactionUpdateAliases,
