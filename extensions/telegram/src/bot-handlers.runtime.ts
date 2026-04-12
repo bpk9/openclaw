@@ -1135,6 +1135,16 @@ export const registerTelegramHandlers = ({
     "new",
     "reaction",
     "reactions",
+    "previous",
+    "current",
+    "previous_reaction",
+    "current_reaction",
+    "previous_reactions",
+    "current_reactions",
+    "previousReaction",
+    "currentReaction",
+    "previousReactions",
+    "currentReactions",
   ] as const;
   const DIRECT_REACTION_COUNT_KEYS = [
     "reaction",
