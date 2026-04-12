@@ -846,53 +846,47 @@ export const registerTelegramHandlers = ({
     records?: unknown;
     entries?: unknown;
     items?: unknown;
+    [key: string]: unknown;
   };
   const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
-  const reactionUpdateWrapperKeys = [
-    "payload",
-    "data",
-    "body",
-    "event",
-    "detail",
-    "update",
-    "updates",
-    "result",
-    "results",
-    "records",
-    "entries",
-    "items",
-  ] as const;
+  const REACTION_UPDATE_CANDIDATE_MAX_DEPTH = 6;
+  const REACTION_UPDATE_CANDIDATE_MAX_RECORDS = 256;
   const resolveUpdateCandidates = (update: unknown): TelegramReactionUpdateAliases[] => {
     if (!isRecord(update)) {
       return [];
     }
 
     const visited = new Set<Record<string, unknown>>();
-    const queue: Record<string, unknown>[] = [update as Record<string, unknown>];
+    const queue: Array<{ record: Record<string, unknown>; depth: number }> = [
+      { record: update as Record<string, unknown>, depth: 0 },
+    ];
     const candidates: TelegramReactionUpdateAliases[] = [];
 
-    while (queue.length > 0) {
+    while (queue.length > 0 && candidates.length < REACTION_UPDATE_CANDIDATE_MAX_RECORDS) {
       const current = queue.shift();
-      if (!current || visited.has(current)) {
+      if (!current || visited.has(current.record)) {
         continue;
       }
 
-      visited.add(current);
-      const typedCurrent = current as TelegramReactionUpdateAliases;
+      visited.add(current.record);
+      const typedCurrent = current.record as TelegramReactionUpdateAliases;
       candidates.push(typedCurrent);
 
-      for (const key of reactionUpdateWrapperKeys) {
-        const nested = typedCurrent[key];
+      if (current.depth >= REACTION_UPDATE_CANDIDATE_MAX_DEPTH) {
+        continue;
+      }
+
+      for (const nested of Object.values(typedCurrent)) {
         if (isRecord(nested) && !visited.has(nested)) {
-          queue.push(nested);
+          queue.push({ record: nested, depth: current.depth + 1 });
           continue;
         }
 
         if (Array.isArray(nested)) {
           for (const item of nested) {
             if (isRecord(item) && !visited.has(item)) {
-              queue.push(item);
+              queue.push({ record: item, depth: current.depth + 1 });
             }
           }
         }
