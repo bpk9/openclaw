@@ -1225,6 +1225,10 @@ export const registerTelegramHandlers = ({
     "state_next_value",
     "state_prev_values",
     "state_next_values",
+    "state_prior_value",
+    "state_latest_value",
+    "state_prior_values",
+    "state_latest_values",
     "state_pre",
     "state_post",
     "state_pres",
@@ -1239,6 +1243,10 @@ export const registerTelegramHandlers = ({
     "stateNextValue",
     "statePrevValues",
     "stateNextValues",
+    "statePriorValue",
+    "stateLatestValue",
+    "statePriorValues",
+    "stateLatestValues",
     "statePre",
     "statePost",
     "statePres",
@@ -1473,6 +1481,10 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("current_value", ["state_next_value", "stateNextValue"]);
     assignIfUndefined("previous_values", ["state_prev_values", "statePrevValues"]);
     assignIfUndefined("current_values", ["state_next_values", "stateNextValues"]);
+    assignIfUndefined("previous_value", ["state_prior_value", "statePriorValue"]);
+    assignIfUndefined("current_value", ["state_latest_value", "stateLatestValue"]);
+    assignIfUndefined("previous_values", ["state_prior_values", "statePriorValues"]);
+    assignIfUndefined("current_values", ["state_latest_values", "stateLatestValues"]);
     assignIfUndefined("pre_state", ["state_pre", "statePre"]);
     assignIfUndefined("post_state", ["state_post", "statePost"]);
     assignIfUndefined("pre_states", ["state_pres", "statePres"]);
@@ -1495,6 +1507,10 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("currentValue", ["stateNextValue"]);
     assignIfUndefined("previousValues", ["statePrevValues"]);
     assignIfUndefined("currentValues", ["stateNextValues"]);
+    assignIfUndefined("previousValue", ["statePriorValue"]);
+    assignIfUndefined("currentValue", ["stateLatestValue"]);
+    assignIfUndefined("previousValues", ["statePriorValues"]);
+    assignIfUndefined("currentValues", ["stateLatestValues"]);
     assignIfUndefined("preState", ["statePre"]);
     assignIfUndefined("postState", ["statePost"]);
     assignIfUndefined("preStates", ["statePres"]);
