@@ -1217,8 +1217,12 @@ export const registerTelegramHandlers = ({
     "state_new",
     "state_old_reaction",
     "state_new_reaction",
+    "state_old_value",
+    "state_new_value",
     "state_old_reactions",
     "state_new_reactions",
+    "state_old_values",
+    "state_new_values",
     "state_olds",
     "state_news",
     "state_older",
@@ -1229,8 +1233,12 @@ export const registerTelegramHandlers = ({
     "stateNew",
     "stateOldReaction",
     "stateNewReaction",
+    "stateOldValue",
+    "stateNewValue",
     "stateOldReactions",
     "stateNewReactions",
+    "stateOldValues",
+    "stateNewValues",
     "stateOlds",
     "stateNews",
     "stateOlder",
@@ -1553,8 +1561,12 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("new_state", ["state_new", "stateNew"]);
     assignIfUndefined("old_reaction", ["state_old_reaction", "stateOldReaction"]);
     assignIfUndefined("new_reaction", ["state_new_reaction", "stateNewReaction"]);
+    assignIfUndefined("old_value", ["state_old_value", "stateOldValue"]);
+    assignIfUndefined("new_value", ["state_new_value", "stateNewValue"]);
     assignIfUndefined("old_reactions", ["state_old_reactions", "stateOldReactions"]);
     assignIfUndefined("new_reactions", ["state_new_reactions", "stateNewReactions"]);
+    assignIfUndefined("old_values", ["state_old_values", "stateOldValues"]);
+    assignIfUndefined("new_values", ["state_new_values", "stateNewValues"]);
     assignIfUndefined("old_states", ["state_olds", "stateOlds"]);
     assignIfUndefined("new_states", ["state_news", "stateNews"]);
     assignIfUndefined("old_state", ["state_older", "stateOlder"]);
@@ -1607,8 +1619,12 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("newState", ["stateNew"]);
     assignIfUndefined("oldReaction", ["stateOldReaction"]);
     assignIfUndefined("newReaction", ["stateNewReaction"]);
+    assignIfUndefined("oldValue", ["stateOldValue"]);
+    assignIfUndefined("newValue", ["stateNewValue"]);
     assignIfUndefined("oldReactions", ["stateOldReactions"]);
     assignIfUndefined("newReactions", ["stateNewReactions"]);
+    assignIfUndefined("oldValues", ["stateOldValues"]);
+    assignIfUndefined("newValues", ["stateNewValues"]);
     assignIfUndefined("oldStates", ["stateOlds"]);
     assignIfUndefined("newStates", ["stateNews"]);
     assignIfUndefined("oldState", ["stateOlder"]);
