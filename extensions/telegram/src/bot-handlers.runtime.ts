@@ -1350,6 +1350,8 @@ export const registerTelegramHandlers = ({
     "state_latest_reaction",
     "state_beginning_reaction",
     "state_ending_reaction",
+    "state_start_reaction",
+    "state_end_reaction",
     "state_initial_reaction",
     "state_final_reaction",
     "state_first_reaction",
@@ -1362,6 +1364,8 @@ export const registerTelegramHandlers = ({
     "state_latest_reactions",
     "state_beginning_reactions",
     "state_ending_reactions",
+    "state_start_reactions",
+    "state_end_reactions",
     "state_initial_reactions",
     "state_final_reactions",
     "state_first_reactions",
@@ -1388,6 +1392,8 @@ export const registerTelegramHandlers = ({
     "state_latest_value",
     "state_beginning_value",
     "state_ending_value",
+    "state_start_value",
+    "state_end_value",
     "state_initial_value",
     "state_final_value",
     "state_first_value",
@@ -1401,6 +1407,8 @@ export const registerTelegramHandlers = ({
     "state_latest_values",
     "state_beginning_values",
     "state_ending_values",
+    "state_start_values",
+    "state_end_values",
     "state_initial_values",
     "state_final_values",
     "state_first_values",
@@ -1452,6 +1460,8 @@ export const registerTelegramHandlers = ({
     "stateLatestReaction",
     "stateBeginningReaction",
     "stateEndingReaction",
+    "stateStartReaction",
+    "stateEndReaction",
     "stateInitialReaction",
     "stateFinalReaction",
     "stateFirstReaction",
@@ -1464,6 +1474,8 @@ export const registerTelegramHandlers = ({
     "stateLatestReactions",
     "stateBeginningReactions",
     "stateEndingReactions",
+    "stateStartReactions",
+    "stateEndReactions",
     "stateInitialReactions",
     "stateFinalReactions",
     "stateFirstReactions",
@@ -1490,6 +1502,8 @@ export const registerTelegramHandlers = ({
     "stateLatestValue",
     "stateBeginningValue",
     "stateEndingValue",
+    "stateStartValue",
+    "stateEndValue",
     "stateInitialValue",
     "stateFinalValue",
     "stateFirstValue",
@@ -1503,6 +1517,8 @@ export const registerTelegramHandlers = ({
     "stateLatestValues",
     "stateBeginningValues",
     "stateEndingValues",
+    "stateStartValues",
+    "stateEndValues",
     "stateInitialValues",
     "stateFinalValues",
     "stateFirstValues",
@@ -1832,6 +1848,8 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("current_reaction", ["state_latest_reaction", "stateLatestReaction"]);
     assignIfUndefined("previous_reaction", ["state_beginning_reaction", "stateBeginningReaction"]);
     assignIfUndefined("current_reaction", ["state_ending_reaction", "stateEndingReaction"]);
+    assignIfUndefined("previous_reaction", ["state_start_reaction", "stateStartReaction"]);
+    assignIfUndefined("current_reaction", ["state_end_reaction", "stateEndReaction"]);
     assignIfUndefined("previous_reaction", ["state_initial_reaction", "stateInitialReaction"]);
     assignIfUndefined("current_reaction", ["state_final_reaction", "stateFinalReaction"]);
     assignIfUndefined("previous_reaction", ["state_first_reaction", "stateFirstReaction"]);
@@ -1845,6 +1863,8 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("current_reactions", ["state_latest_reactions", "stateLatestReactions"]);
     assignIfUndefined("previous_reactions", ["state_beginning_reactions", "stateBeginningReactions"]);
     assignIfUndefined("current_reactions", ["state_ending_reactions", "stateEndingReactions"]);
+    assignIfUndefined("previous_reactions", ["state_start_reactions", "stateStartReactions"]);
+    assignIfUndefined("current_reactions", ["state_end_reactions", "stateEndReactions"]);
     assignIfUndefined("previous_reactions", ["state_initial_reactions", "stateInitialReactions"]);
     assignIfUndefined("current_reactions", ["state_final_reactions", "stateFinalReactions"]);
     assignIfUndefined("previous_reactions", ["state_first_reactions", "stateFirstReactions"]);
@@ -1870,6 +1890,8 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("current_value", ["state_latest_value", "stateLatestValue"]);
     assignIfUndefined("previous_value", ["state_beginning_value", "stateBeginningValue"]);
     assignIfUndefined("current_value", ["state_ending_value", "stateEndingValue"]);
+    assignIfUndefined("previous_value", ["state_start_value", "stateStartValue"]);
+    assignIfUndefined("current_value", ["state_end_value", "stateEndValue"]);
     assignIfUndefined("previous_value", ["state_initial_value", "stateInitialValue"]);
     assignIfUndefined("current_value", ["state_final_value", "stateFinalValue"]);
     assignIfUndefined("previous_value", ["state_first_value", "stateFirstValue"]);
@@ -1883,6 +1905,8 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("current_values", ["state_latest_values", "stateLatestValues"]);
     assignIfUndefined("previous_values", ["state_beginning_values", "stateBeginningValues"]);
     assignIfUndefined("current_values", ["state_ending_values", "stateEndingValues"]);
+    assignIfUndefined("previous_values", ["state_start_values", "stateStartValues"]);
+    assignIfUndefined("current_values", ["state_end_values", "stateEndValues"]);
     assignIfUndefined("previous_values", ["state_initial_values", "stateInitialValues"]);
     assignIfUndefined("current_values", ["state_final_values", "stateFinalValues"]);
     assignIfUndefined("previous_values", ["state_first_values", "stateFirstValues"]);
@@ -1954,6 +1978,8 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("currentReaction", ["stateLatestReaction"]);
     assignIfUndefined("previousReaction", ["stateBeginningReaction"]);
     assignIfUndefined("currentReaction", ["stateEndingReaction"]);
+    assignIfUndefined("previousReaction", ["stateStartReaction"]);
+    assignIfUndefined("currentReaction", ["stateEndReaction"]);
     assignIfUndefined("previousReaction", ["stateInitialReaction"]);
     assignIfUndefined("currentReaction", ["stateFinalReaction"]);
     assignIfUndefined("previousReaction", ["stateFirstReaction"]);
@@ -1965,6 +1991,8 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("currentReactions", ["stateLatestReactions"]);
     assignIfUndefined("previousReactions", ["stateBeginningReactions"]);
     assignIfUndefined("currentReactions", ["stateEndingReactions"]);
+    assignIfUndefined("previousReactions", ["stateStartReactions"]);
+    assignIfUndefined("currentReactions", ["stateEndReactions"]);
     assignIfUndefined("previousReactions", ["stateInitialReactions"]);
     assignIfUndefined("currentReactions", ["stateFinalReactions"]);
     assignIfUndefined("previousReactions", ["stateFirstReactions"]);
@@ -1988,6 +2016,8 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("currentValue", ["stateLatestValue"]);
     assignIfUndefined("previousValue", ["stateBeginningValue"]);
     assignIfUndefined("currentValue", ["stateEndingValue"]);
+    assignIfUndefined("previousValue", ["stateStartValue"]);
+    assignIfUndefined("currentValue", ["stateEndValue"]);
     assignIfUndefined("previousValue", ["stateInitialValue"]);
     assignIfUndefined("currentValue", ["stateFinalValue"]);
     assignIfUndefined("previousValue", ["stateFirstValue"]);
@@ -2001,6 +2031,8 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("currentValues", ["stateLatestValues"]);
     assignIfUndefined("previousValues", ["stateBeginningValues"]);
     assignIfUndefined("currentValues", ["stateEndingValues"]);
+    assignIfUndefined("previousValues", ["stateStartValues"]);
+    assignIfUndefined("currentValues", ["stateEndValues"]);
     assignIfUndefined("previousValues", ["stateInitialValues"]);
     assignIfUndefined("currentValues", ["stateFinalValues"]);
     assignIfUndefined("previousValues", ["stateFirstValues"]);
