@@ -1255,6 +1255,10 @@ export const registerTelegramHandlers = ({
     "state_news",
     "state_older",
     "state_newer",
+    "state_older_state",
+    "state_newer_state",
+    "state_older_states",
+    "state_newer_states",
     "statePrevious",
     "stateCurrent",
     "statePreviousState",
@@ -1295,6 +1299,10 @@ export const registerTelegramHandlers = ({
     "stateNews",
     "stateOlder",
     "stateNewer",
+    "stateOlderState",
+    "stateNewerState",
+    "stateOlderStates",
+    "stateNewerStates",
     "state_prev",
     "state_next",
     "state_previous_value",
@@ -1727,6 +1735,10 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("new_states", ["state_news", "stateNews", "state_new_states", "stateNewStates"]);
     assignIfUndefined("old_state", ["state_older", "stateOlder"]);
     assignIfUndefined("new_state", ["state_newer", "stateNewer"]);
+    assignIfUndefined("previous_state", ["state_older_state", "stateOlderState"]);
+    assignIfUndefined("current_state", ["state_newer_state", "stateNewerState"]);
+    assignIfUndefined("previous_states", ["state_older_states", "stateOlderStates"]);
+    assignIfUndefined("current_states", ["state_newer_states", "stateNewerStates"]);
     assignIfUndefined("previous_state", ["state_prev", "statePrev"]);
     assignIfUndefined("current_state", ["state_next", "stateNext"]);
     assignIfUndefined("previous_state", ["state_prev_state", "statePrevState"]);
