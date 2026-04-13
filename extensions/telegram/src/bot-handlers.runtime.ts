@@ -1217,12 +1217,16 @@ export const registerTelegramHandlers = ({
     "state_current_state",
     "state_prior_state",
     "state_latest_state",
+    "state_initial_state",
+    "state_final_state",
     "state_former_state",
     "state_latter_state",
     "state_previous_states",
     "state_current_states",
     "state_prior_states",
     "state_latest_states",
+    "state_initial_states",
+    "state_final_states",
     "state_former_states",
     "state_latter_states",
     "state_old",
@@ -1249,10 +1253,14 @@ export const registerTelegramHandlers = ({
     "stateCurrentState",
     "statePriorState",
     "stateLatestState",
+    "stateInitialState",
+    "stateFinalState",
     "statePreviousStates",
     "stateCurrentStates",
     "statePriorStates",
     "stateLatestStates",
+    "stateInitialStates",
+    "stateFinalStates",
     "stateOld",
     "stateNew",
     "stateOldState",
@@ -1621,12 +1629,16 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("current_state", ["state_current_state", "stateCurrentState"]);
     assignIfUndefined("previous_state", ["state_prior_state", "statePriorState"]);
     assignIfUndefined("current_state", ["state_latest_state", "stateLatestState"]);
+    assignIfUndefined("previous_state", ["state_initial_state", "stateInitialState"]);
+    assignIfUndefined("current_state", ["state_final_state", "stateFinalState"]);
     assignIfUndefined("previous_state", ["state_former_state", "stateFormerState"]);
     assignIfUndefined("current_state", ["state_latter_state", "stateLatterState"]);
     assignIfUndefined("previous_states", ["state_previous_states", "statePreviousStates"]);
     assignIfUndefined("current_states", ["state_current_states", "stateCurrentStates"]);
     assignIfUndefined("previous_states", ["state_prior_states", "statePriorStates"]);
     assignIfUndefined("current_states", ["state_latest_states", "stateLatestStates"]);
+    assignIfUndefined("previous_states", ["state_initial_states", "stateInitialStates"]);
+    assignIfUndefined("current_states", ["state_final_states", "stateFinalStates"]);
     assignIfUndefined("previous_states", ["state_former_states", "stateFormerStates"]);
     assignIfUndefined("current_states", ["state_latter_states", "stateLatterStates"]);
     assignIfUndefined("old_state", ["state_old", "stateOld", "state_old_state", "stateOldState"]);
@@ -1707,10 +1719,14 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("currentState", ["stateCurrentState"]);
     assignIfUndefined("previousState", ["statePriorState"]);
     assignIfUndefined("currentState", ["stateLatestState"]);
+    assignIfUndefined("previousState", ["stateInitialState"]);
+    assignIfUndefined("currentState", ["stateFinalState"]);
     assignIfUndefined("previousStates", ["statePreviousStates"]);
     assignIfUndefined("currentStates", ["stateCurrentStates"]);
     assignIfUndefined("previousStates", ["statePriorStates"]);
     assignIfUndefined("currentStates", ["stateLatestStates"]);
+    assignIfUndefined("previousStates", ["stateInitialStates"]);
+    assignIfUndefined("currentStates", ["stateFinalStates"]);
     assignIfUndefined("oldState", ["stateOld", "stateOldState"]);
     assignIfUndefined("newState", ["stateNew", "stateNewState"]);
     assignIfUndefined("oldReaction", ["stateOldReaction"]);
