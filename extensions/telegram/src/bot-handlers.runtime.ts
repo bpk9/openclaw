@@ -1348,6 +1348,8 @@ export const registerTelegramHandlers = ({
     "state_prior_reaction",
     "state_earliest_reaction",
     "state_latest_reaction",
+    "state_beginning_reaction",
+    "state_ending_reaction",
     "state_initial_reaction",
     "state_final_reaction",
     "state_first_reaction",
@@ -1358,6 +1360,8 @@ export const registerTelegramHandlers = ({
     "state_latter_reaction",
     "state_prior_reactions",
     "state_latest_reactions",
+    "state_beginning_reactions",
+    "state_ending_reactions",
     "state_initial_reactions",
     "state_final_reactions",
     "state_first_reactions",
@@ -1446,6 +1450,8 @@ export const registerTelegramHandlers = ({
     "statePriorReaction",
     "stateEarliestReaction",
     "stateLatestReaction",
+    "stateBeginningReaction",
+    "stateEndingReaction",
     "stateInitialReaction",
     "stateFinalReaction",
     "stateFirstReaction",
@@ -1456,6 +1462,8 @@ export const registerTelegramHandlers = ({
     "stateLatterReaction",
     "statePriorReactions",
     "stateLatestReactions",
+    "stateBeginningReactions",
+    "stateEndingReactions",
     "stateInitialReactions",
     "stateFinalReactions",
     "stateFirstReactions",
@@ -1822,6 +1830,8 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("previous_reaction", ["state_prior_reaction", "statePriorReaction"]);
     assignIfUndefined("previous_reaction", ["state_earliest_reaction", "stateEarliestReaction"]);
     assignIfUndefined("current_reaction", ["state_latest_reaction", "stateLatestReaction"]);
+    assignIfUndefined("previous_reaction", ["state_beginning_reaction", "stateBeginningReaction"]);
+    assignIfUndefined("current_reaction", ["state_ending_reaction", "stateEndingReaction"]);
     assignIfUndefined("previous_reaction", ["state_initial_reaction", "stateInitialReaction"]);
     assignIfUndefined("current_reaction", ["state_final_reaction", "stateFinalReaction"]);
     assignIfUndefined("previous_reaction", ["state_first_reaction", "stateFirstReaction"]);
@@ -1833,6 +1843,8 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("previous_reactions", ["state_prior_reactions", "statePriorReactions"]);
     assignIfUndefined("previous_reactions", ["state_earliest_reactions", "stateEarliestReactions"]);
     assignIfUndefined("current_reactions", ["state_latest_reactions", "stateLatestReactions"]);
+    assignIfUndefined("previous_reactions", ["state_beginning_reactions", "stateBeginningReactions"]);
+    assignIfUndefined("current_reactions", ["state_ending_reactions", "stateEndingReactions"]);
     assignIfUndefined("previous_reactions", ["state_initial_reactions", "stateInitialReactions"]);
     assignIfUndefined("current_reactions", ["state_final_reactions", "stateFinalReactions"]);
     assignIfUndefined("previous_reactions", ["state_first_reactions", "stateFirstReactions"]);
@@ -1940,6 +1952,8 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("previousReaction", ["statePriorReaction"]);
     assignIfUndefined("previousReaction", ["stateEarliestReaction"]);
     assignIfUndefined("currentReaction", ["stateLatestReaction"]);
+    assignIfUndefined("previousReaction", ["stateBeginningReaction"]);
+    assignIfUndefined("currentReaction", ["stateEndingReaction"]);
     assignIfUndefined("previousReaction", ["stateInitialReaction"]);
     assignIfUndefined("currentReaction", ["stateFinalReaction"]);
     assignIfUndefined("previousReaction", ["stateFirstReaction"]);
@@ -1949,6 +1963,8 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("previousReactions", ["statePriorReactions"]);
     assignIfUndefined("previousReactions", ["stateEarliestReactions"]);
     assignIfUndefined("currentReactions", ["stateLatestReactions"]);
+    assignIfUndefined("previousReactions", ["stateBeginningReactions"]);
+    assignIfUndefined("currentReactions", ["stateEndingReactions"]);
     assignIfUndefined("previousReactions", ["stateInitialReactions"]);
     assignIfUndefined("currentReactions", ["stateFinalReactions"]);
     assignIfUndefined("previousReactions", ["stateFirstReactions"]);
