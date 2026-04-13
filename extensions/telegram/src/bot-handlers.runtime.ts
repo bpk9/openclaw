@@ -1303,8 +1303,12 @@ export const registerTelegramHandlers = ({
     "state_next_values",
     "state_prior_value",
     "state_latest_value",
+    "state_former_value",
+    "state_latter_value",
     "state_prior_values",
     "state_latest_values",
+    "state_former_values",
+    "state_latter_values",
     "state_pre",
     "state_post",
     "state_pres",
@@ -1349,8 +1353,12 @@ export const registerTelegramHandlers = ({
     "stateNextValues",
     "statePriorValue",
     "stateLatestValue",
+    "stateFormerValue",
+    "stateLatterValue",
     "statePriorValues",
     "stateLatestValues",
+    "stateFormerValues",
+    "stateLatterValues",
     "statePre",
     "statePost",
     "statePres",
@@ -1651,8 +1659,12 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("current_values", ["state_next_values", "stateNextValues"]);
     assignIfUndefined("previous_value", ["state_prior_value", "statePriorValue"]);
     assignIfUndefined("current_value", ["state_latest_value", "stateLatestValue"]);
+    assignIfUndefined("previous_value", ["state_former_value", "stateFormerValue"]);
+    assignIfUndefined("current_value", ["state_latter_value", "stateLatterValue"]);
     assignIfUndefined("previous_values", ["state_prior_values", "statePriorValues"]);
     assignIfUndefined("current_values", ["state_latest_values", "stateLatestValues"]);
+    assignIfUndefined("previous_values", ["state_former_values", "stateFormerValues"]);
+    assignIfUndefined("current_values", ["state_latter_values", "stateLatterValues"]);
     assignIfUndefined("pre_state", ["state_pre", "statePre"]);
     assignIfUndefined("post_state", ["state_post", "statePost"]);
     assignIfUndefined("pre_states", ["state_pres", "statePres"]);
@@ -1721,8 +1733,12 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("currentValues", ["stateNextValues"]);
     assignIfUndefined("previousValue", ["statePriorValue"]);
     assignIfUndefined("currentValue", ["stateLatestValue"]);
+    assignIfUndefined("previousValue", ["stateFormerValue"]);
+    assignIfUndefined("currentValue", ["stateLatterValue"]);
     assignIfUndefined("previousValues", ["statePriorValues"]);
     assignIfUndefined("currentValues", ["stateLatestValues"]);
+    assignIfUndefined("previousValues", ["stateFormerValues"]);
+    assignIfUndefined("currentValues", ["stateLatterValues"]);
     assignIfUndefined("preState", ["statePre"]);
     assignIfUndefined("postState", ["statePost"]);
     assignIfUndefined("preStates", ["statePres"]);
