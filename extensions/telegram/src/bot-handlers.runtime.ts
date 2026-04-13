@@ -1261,10 +1261,14 @@ export const registerTelegramHandlers = ({
     "state_newer_state",
     "state_oldest_state",
     "state_newest_state",
+    "state_oldest_reaction",
+    "state_newest_reaction",
     "state_older_states",
     "state_newer_states",
     "state_oldest_states",
     "state_newest_states",
+    "state_oldest_reactions",
+    "state_newest_reactions",
     "statePrevious",
     "stateCurrent",
     "statePreviousState",
@@ -1311,10 +1315,14 @@ export const registerTelegramHandlers = ({
     "stateNewerState",
     "stateOldestState",
     "stateNewestState",
+    "stateOldestReaction",
+    "stateNewestReaction",
     "stateOlderStates",
     "stateNewerStates",
     "stateOldestStates",
     "stateNewestStates",
+    "stateOldestReactions",
+    "stateNewestReactions",
     "state_prev",
     "state_next",
     "state_previous_value",
@@ -1753,10 +1761,14 @@ export const registerTelegramHandlers = ({
     assignIfUndefined("current_state", ["state_newer_state", "stateNewerState"]);
     assignIfUndefined("previous_state", ["state_oldest_state", "stateOldestState"]);
     assignIfUndefined("current_state", ["state_newest_state", "stateNewestState"]);
+    assignIfUndefined("previous_reaction", ["state_oldest_reaction", "stateOldestReaction"]);
+    assignIfUndefined("current_reaction", ["state_newest_reaction", "stateNewestReaction"]);
     assignIfUndefined("previous_states", ["state_older_states", "stateOlderStates"]);
     assignIfUndefined("current_states", ["state_newer_states", "stateNewerStates"]);
     assignIfUndefined("previous_states", ["state_oldest_states", "stateOldestStates"]);
     assignIfUndefined("current_states", ["state_newest_states", "stateNewestStates"]);
+    assignIfUndefined("previous_reactions", ["state_oldest_reactions", "stateOldestReactions"]);
+    assignIfUndefined("current_reactions", ["state_newest_reactions", "stateNewestReactions"]);
     assignIfUndefined("previous_state", ["state_prev", "statePrev"]);
     assignIfUndefined("current_state", ["state_next", "stateNext"]);
     assignIfUndefined("previous_state", ["state_prev_state", "statePrevState"]);
