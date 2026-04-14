@@ -1205,6 +1205,10 @@ export const registerTelegramHandlers = ({
     "afterStates",
     "state_before",
     "state_after",
+    "state_before_state",
+    "state_after_state",
+    "stateBeforeState",
+    "stateAfterState",
     "state_before_reaction",
     "state_after_reaction",
     "state_before_reactions",
@@ -1755,8 +1759,8 @@ export const registerTelegramHandlers = ({
     // Some adapter/runtime paths use inverted state aliases (`state_before`/`state_after`)
     // even for direct-envelope reaction updates. Map them onto the canonical
     // before/after state keys used by downstream diff resolution.
-    assignIfUndefined("before_state", ["state_before", "stateBefore"]);
-    assignIfUndefined("after_state", ["state_after", "stateAfter"]);
+    assignIfUndefined("before_state", ["state_before", "stateBefore", "state_before_state", "stateBeforeState"]);
+    assignIfUndefined("after_state", ["state_after", "stateAfter", "state_after_state", "stateAfterState"]);
     assignIfUndefined("before_states", ["state_befores", "stateBefores"]);
     assignIfUndefined("after_states", ["state_afters", "stateAfters"]);
     assignIfUndefined("before_value", ["state_before_value", "stateBeforeValue"]);
