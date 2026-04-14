@@ -1209,6 +1209,10 @@ export const registerTelegramHandlers = ({
     "state_after_state",
     "stateBeforeState",
     "stateAfterState",
+    "state_before_states",
+    "state_after_states",
+    "stateBeforeStates",
+    "stateAfterStates",
     "state_before_reaction",
     "state_after_reaction",
     "state_before_reactions",
@@ -1761,8 +1765,8 @@ export const registerTelegramHandlers = ({
     // before/after state keys used by downstream diff resolution.
     assignIfUndefined("before_state", ["state_before", "stateBefore", "state_before_state", "stateBeforeState"]);
     assignIfUndefined("after_state", ["state_after", "stateAfter", "state_after_state", "stateAfterState"]);
-    assignIfUndefined("before_states", ["state_befores", "stateBefores"]);
-    assignIfUndefined("after_states", ["state_afters", "stateAfters"]);
+    assignIfUndefined("before_states", ["state_befores", "stateBefores", "state_before_states", "stateBeforeStates"]);
+    assignIfUndefined("after_states", ["state_afters", "stateAfters", "state_after_states", "stateAfterStates"]);
     assignIfUndefined("before_value", ["state_before_value", "stateBeforeValue"]);
     assignIfUndefined("after_value", ["state_after_value", "stateAfterValue"]);
     assignIfUndefined("before_values", ["state_before_values", "stateBeforeValues"]);
