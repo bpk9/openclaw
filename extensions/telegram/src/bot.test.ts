@@ -10648,6 +10648,51 @@ describe("createTelegramBot", () => {
     );
   });
 
+
+  it("uses direct-envelope state_prior_values/state_latest_values raw update when parsed reaction omits arrays", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: {
+        update_id: 503717261170,
+        chat: { id: 1234, type: "private" },
+        message_id: 10617261170,
+        user: { id: 9, first_name: "Ada" },
+        date: 1736380800,
+        state_prior_values: [{ type: "emoji", emoji: FIRE_EMOJI }],
+        state_latest_values: [
+          { type: "emoji", emoji: FIRE_EMOJI },
+          { type: "emoji", emoji: PARTY_EMOJI },
+        ],
+      },
+      messageReaction: {
+        chat: { id: 1234, type: "private" },
+        message_id: 10617261170,
+        user: { id: 9, first_name: "Ada" },
+        date: 1736380800,
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      `Telegram reaction added: ${PARTY_EMOJI} by Ada on msg 10617261170`,
+      expect.any(Object),
+    );
+  });
+
   it("uses direct-envelope state_pre/state_post raw update when parsed reaction omits arrays", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();
