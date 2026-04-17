@@ -3199,13 +3199,14 @@ describe("createTelegramBot", () => {
   });
 
   it.each([
+    ["reaction", "reaction"],
     ["reactionCount", "reactionCount"],
     ["reactionCounts", "reactionCounts"],
   ])(
     "enqueues reaction_count fallback from direct-envelope %s raw update",
     async (
       _label: string,
-      reactionKey: "reactionCount" | "reactionCounts",
+      reactionKey: "reaction" | "reactionCount" | "reactionCounts",
     ) => {
       onSpy.mockClear();
       enqueueSystemEventSpy.mockClear();
