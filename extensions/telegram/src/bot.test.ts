@@ -3200,13 +3200,14 @@ describe("createTelegramBot", () => {
 
   it.each([
     ["reaction", "reaction"],
+    ["reactions", "reactions"],
     ["reactionCount", "reactionCount"],
     ["reactionCounts", "reactionCounts"],
   ])(
     "enqueues reaction_count fallback from direct-envelope %s raw update",
     async (
       _label: string,
-      reactionKey: "reaction" | "reactionCount" | "reactionCounts",
+      reactionKey: "reaction" | "reactions" | "reactionCount" | "reactionCounts",
     ) => {
       onSpy.mockClear();
       enqueueSystemEventSpy.mockClear();
