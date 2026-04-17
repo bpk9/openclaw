@@ -3160,6 +3160,44 @@ describe("createTelegramBot", () => {
     );
   });
 
+  it("enqueues reaction_count fallback from direct-envelope reaction_count raw update", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", reactionNotifications: "all" },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction_count") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: {
+        update_id: 500741,
+        chat: { id: 43321, type: "private" },
+        message_id: 5611,
+        reaction_count: [{ type: "emoji", emoji: THUMBS_UP_EMOJI, total_count: 9 }],
+      },
+      messageReactionCount: {
+        reactions: [],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      `Telegram reaction count changed on msg 5611: ${THUMBS_UP_EMOJI}:9`,
+      expect.objectContaining({
+        contextKey: expect.stringContaining(
+          `telegram:reaction:count:43321:5611:${THUMBS_UP_EMOJI}:9`,
+        ),
+      }),
+    );
+  });
+
   it.each([
     ["reactionCount", "reactionCount"],
     ["reactionCounts", "reactionCounts"],
