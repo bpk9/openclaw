@@ -5432,7 +5432,29 @@ export const registerTelegramHandlers = ({
       });
       const summary = summaryParts.length > 0 ? summaryParts.join(",") : "none";
 
-      const peerId = String(chatId);
+      const reactionSenderIdCandidate =
+        parseNumericId(
+          (reactionCountEnvelope as { user?: { id?: unknown } }).user?.id ??
+            (rawReactionCountEnvelope as { user?: { id?: unknown } } | undefined)?.user?.id,
+        ) ??
+        parseNumericId(
+          (reactionCountEnvelope as { from?: { id?: unknown } }).from?.id ??
+            (rawReactionCountEnvelope as { from?: { id?: unknown } } | undefined)?.from?.id,
+        ) ??
+        parseNumericId(
+          (reactionCountEnvelope as { actor_chat?: { id?: unknown } }).actor_chat?.id ??
+            (rawReactionCountEnvelope as { actor_chat?: { id?: unknown } } | undefined)
+              ?.actor_chat?.id,
+        ) ??
+        parseNumericId(
+          (reactionCountEnvelope as { sender_chat?: { id?: unknown } }).sender_chat?.id ??
+            (rawReactionCountEnvelope as { sender_chat?: { id?: unknown } } | undefined)
+              ?.sender_chat?.id,
+        );
+      const peerId = resolveTelegramDirectPeerId({
+        chatId,
+        senderId: reactionSenderIdCandidate,
+      });
       const parentPeer = buildTelegramParentPeer({
         isGroup,
         resolvedThreadId: undefined,
