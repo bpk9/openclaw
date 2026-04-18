@@ -776,7 +776,9 @@ export async function runHeartbeatOnce(opts: {
   }).responsePrefix;
 
   const canRelayToUser = Boolean(
-    delivery.channel !== "none" && delivery.to && visibility.showAlerts,
+    delivery.channel !== "none" &&
+      delivery.to &&
+      (visibility.showAlerts || isTelegramReactionWake),
   );
   const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
   const { prompt, hasExecCompletion, hasCronEvents } = resolveHeartbeatRunPrompt({
