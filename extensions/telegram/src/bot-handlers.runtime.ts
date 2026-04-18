@@ -30,7 +30,6 @@ import {
 } from "openclaw/plugin-sdk/conversation-runtime";
 import { parseExecApprovalCommandText } from "openclaw/plugin-sdk/infra-runtime";
 import { formatModelsAvailableHeader } from "openclaw/plugin-sdk/models-provider-runtime";
-import { resolveAgentRoute } from "openclaw/plugin-sdk/routing";
 import { resolveThreadSessionKeys } from "openclaw/plugin-sdk/routing";
 import { danger, logVerbose, warn } from "openclaw/plugin-sdk/runtime-env";
 import { resolveTelegramMediaRuntimeOptions } from "./accounts.js";
@@ -67,9 +66,6 @@ import {
 import { resolveMedia } from "./bot/delivery.js";
 import {
   getTelegramTextParts,
-  buildTelegramGroupPeerId,
-  buildTelegramParentPeer,
-  resolveTelegramDirectPeerId,
   resolveTelegramForumFlag,
   resolveTelegramForumThreadId,
   resolveTelegramGroupAllowFromContext,
@@ -4954,21 +4950,14 @@ export const registerTelegramHandlers = ({
       const resolvedThreadId = isForum
         ? resolveTelegramForumThreadId({ isForum, messageThreadId: undefined })
         : undefined;
-      const peerId = isGroup
-        ? buildTelegramGroupPeerId(chatId, resolvedThreadId)
-        : resolveTelegramDirectPeerId({
-            chatId,
-            senderId: user?.id,
-          });
-      const parentPeer = buildTelegramParentPeer({ isGroup, resolvedThreadId, chatId });
-      // Fresh config for bindings lookup; other routing inputs are payload-derived.
-      const route = resolveAgentRoute({
+      const route = resolveTelegramConversationRoute({
         cfg: telegramDeps.loadConfig(),
-        channel: "telegram",
         accountId,
-        peer: { kind: isGroup ? "group" : "direct", id: peerId },
-        parentPeer,
-      });
+        chatId,
+        isGroup,
+        resolvedThreadId,
+        senderId: user?.id,
+      }).route;
       const sessionKey = route.sessionKey;
       reactionPipelineDiag?.(
         `${reactionDiagPrefix} stage=route session=${sessionKey ?? "default"} added=${effectiveAddedReactions
@@ -5451,22 +5440,13 @@ export const registerTelegramHandlers = ({
             (rawReactionCountEnvelope as { sender_chat?: { id?: unknown } } | undefined)
               ?.sender_chat?.id,
         );
-      const peerId = resolveTelegramDirectPeerId({
-        chatId,
-        senderId: reactionSenderIdCandidate,
-      });
-      const parentPeer = buildTelegramParentPeer({
-        isGroup,
-        resolvedThreadId: undefined,
-        chatId,
-      });
-      const route = resolveAgentRoute({
+      const route = resolveTelegramConversationRoute({
         cfg: telegramDeps.loadConfig(),
-        channel: "telegram",
         accountId,
-        peer: { kind: "direct", id: peerId },
-        parentPeer,
-      });
+        chatId,
+        isGroup,
+        senderId: reactionSenderIdCandidate,
+      }).route;
       const sessionKey = route.sessionKey;
 
       const contextKey = `telegram:reaction:count:${chatId}:${messageId}:${summary}`;
