@@ -121,8 +121,19 @@ function queuePendingWakeReason(params?: {
     pendingWakes.set(wakeTargetKey, next);
     return;
   }
-  if (next.priority === previous.priority && next.requestedAt >= previous.requestedAt) {
-    pendingWakes.set(wakeTargetKey, next);
+  if (next.priority === previous.priority) {
+    const previousIsTelegramReaction = isTelegramReactionWakeReason(previous.reason);
+    const nextIsTelegramReaction = isTelegramReactionWakeReason(next.reason);
+    if (previousIsTelegramReaction && !nextIsTelegramReaction) {
+      return;
+    }
+    if (!previousIsTelegramReaction && nextIsTelegramReaction) {
+      pendingWakes.set(wakeTargetKey, next);
+      return;
+    }
+    if (next.requestedAt >= previous.requestedAt) {
+      pendingWakes.set(wakeTargetKey, next);
+    }
   }
 }
 
