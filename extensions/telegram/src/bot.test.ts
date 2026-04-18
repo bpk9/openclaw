@@ -2356,6 +2356,39 @@ describe("createTelegramBot", () => {
     );
   });
 
+  it("keeps reaction_count notifications at own when reactionTrigger is false even if actions.reactions is enabled", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: {
+          dmPolicy: "open",
+          reactionTrigger: false,
+          actions: { reactions: true },
+        },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction_count") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 4993 },
+      messageReactionCount: {
+        chat: { id: 1234, type: "private" },
+        message_id: 46,
+        date: 1736380800,
+        reactions: [{ type: "emoji", emoji: FIRE_EMOJI, total_count: 1 }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).not.toHaveBeenCalled();
+  });
+
   it("enqueues reaction_count fallback from camelCase raw envelope", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();
@@ -3852,6 +3885,41 @@ describe("createTelegramBot", () => {
       `Telegram reaction added: ${THUMBS_UP_EMOJI} by Ada on msg 431`,
       expect.any(Object),
     );
+  });
+
+  it("keeps reactionNotifications at own when reactionTrigger is false even if actions.reactions is enabled", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: {
+          dmPolicy: "open",
+          reactionTrigger: false,
+          actions: { reactions: true },
+        },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 5023 },
+      messageReaction: {
+        chat: { id: 1234, type: "private" },
+        message_id: 432,
+        user: { id: 9, first_name: "Ada" },
+        date: 1736380800,
+        old_reaction: [],
+        new_reaction: [{ type: "emoji", emoji: THUMBS_UP_EMOJI }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).not.toHaveBeenCalled();
   });
 
   it("allows reaction in all mode regardless of message sender", async () => {
