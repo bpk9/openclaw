@@ -930,7 +930,7 @@ export async function runHeartbeatOnce(opts: {
       `[heartbeat-reaction-diag] stage=turn-start reason=telegram-reaction agent=${agentId} session=${runSessionKey} provider=${ctx.Provider} body_chars=${ctx.Body.length}`,
     );
     const replyResult = await getReplyFromConfig(ctx, replyOpts, cfg);
-    const replyPayload = resolveHeartbeatReplyPayload(replyResult);
+    let replyPayload = resolveHeartbeatReplyPayload(replyResult);
     const includeReasoning = heartbeat?.includeReasoning === true;
     const reasoningPayloads = includeReasoning
       ? resolveHeartbeatReasoningPayloads(replyResult).filter((payload) => payload !== replyPayload)
@@ -942,6 +942,25 @@ export async function runHeartbeatOnce(opts: {
         .filter((contextKey) => contextKey.startsWith("telegram:reaction:"));
       reactionWakeDiag(
         `[heartbeat-reaction-diag] stage=queue-post-turn reason=telegram-reaction agent=${agentId} session=${runSessionKey} remaining_total=${remainingEvents.length} remaining_reaction=${remainingReactionContexts.length} remaining_contexts=${remainingReactionContexts.join(",") || "none"}`,
+      );
+    }
+
+    const reactionWakeEmptyReplyFallbackText =
+      isTelegramReactionWake &&
+      canRelayToUser &&
+      pendingReactionEntries.length > 0 &&
+      !hasExecCompletion &&
+      reasoningPayloads.length === 0 &&
+      (!replyPayload || !hasOutboundReplyContent(replyPayload))
+        ? resolveTelegramReactionWakeFallbackText({
+            events: pendingReactionEntries,
+            responsePrefix,
+          })
+        : null;
+    if (reactionWakeEmptyReplyFallbackText) {
+      replyPayload = { text: reactionWakeEmptyReplyFallbackText };
+      reactionWakeDiag?.(
+        `[heartbeat-reaction-diag] stage=empty-reply-fallback reason=telegram-reaction agent=${agentId} session=${runSessionKey} text_chars=${reactionWakeEmptyReplyFallbackText.length}`,
       );
     }
 
