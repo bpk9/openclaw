@@ -1056,6 +1056,7 @@ export async function runHeartbeatOnce(opts: {
     const prevHeartbeatAt =
       typeof entry?.lastHeartbeatSentAt === "number" ? entry.lastHeartbeatSentAt : undefined;
     const isDuplicateMain =
+      !isTelegramReactionWake &&
       !shouldSkipMain &&
       !mediaUrls.length &&
       Boolean(prevHeartbeatText.trim()) &&
