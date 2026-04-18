@@ -2224,6 +2224,39 @@ describe("createTelegramBot", () => {
     expect(enqueueSystemEventSpy).not.toHaveBeenCalled();
   });
 
+  it("preserves explicit off reaction_count notifications when reactionTrigger is enabled", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(true);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: {
+          dmPolicy: "open",
+          reactionTrigger: true,
+          reactionNotifications: "off",
+        },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction_count") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 49913 },
+      messageReactionCount: {
+        chat: { id: 1234, type: "private" },
+        message_id: 443,
+        date: 1736380800,
+        reactions: [{ type: "emoji", emoji: FIRE_EMOJI, total_count: 1 }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).not.toHaveBeenCalled();
+  });
+
   it("preserves explicit own reaction_count notifications when actions.reactions is enabled", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();
@@ -2249,6 +2282,39 @@ describe("createTelegramBot", () => {
       messageReactionCount: {
         chat: { id: 1234, type: "private" },
         message_id: 442,
+        date: 1736380800,
+        reactions: [{ type: "emoji", emoji: FIRE_EMOJI, total_count: 1 }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).not.toHaveBeenCalled();
+  });
+
+  it("preserves explicit off reaction_count notifications when actions.reactions is enabled", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(true);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: {
+          dmPolicy: "open",
+          actions: { reactions: true },
+          reactionNotifications: "off",
+        },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction_count") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 49914 },
+      messageReactionCount: {
+        chat: { id: 1234, type: "private" },
+        message_id: 444,
         date: 1736380800,
         reactions: [{ type: "emoji", emoji: FIRE_EMOJI, total_count: 1 }],
       },
@@ -3648,6 +3714,41 @@ describe("createTelegramBot", () => {
     expect(enqueueSystemEventSpy).not.toHaveBeenCalled();
   });
 
+  it("preserves explicit off reactionNotifications when reactionTrigger is enabled", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(true);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: {
+          dmPolicy: "open",
+          reactionTrigger: true,
+          reactionNotifications: "off",
+        },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 50213 },
+      messageReaction: {
+        chat: { id: 1234, type: "private" },
+        message_id: 4303,
+        user: { id: 9, first_name: "Ada" },
+        date: 1736380800,
+        old_reaction: [],
+        new_reaction: [{ type: "emoji", emoji: THUMBS_UP_EMOJI }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).not.toHaveBeenCalled();
+  });
+
   it("preserves explicit own reactionNotifications when actions.reactions is enabled", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();
@@ -3673,6 +3774,41 @@ describe("createTelegramBot", () => {
       messageReaction: {
         chat: { id: 1234, type: "private" },
         message_id: 4302,
+        user: { id: 9, first_name: "Ada" },
+        date: 1736380800,
+        old_reaction: [],
+        new_reaction: [{ type: "emoji", emoji: THUMBS_UP_EMOJI }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).not.toHaveBeenCalled();
+  });
+
+  it("preserves explicit off reactionNotifications when actions.reactions is enabled", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(true);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: {
+          dmPolicy: "open",
+          actions: { reactions: true },
+          reactionNotifications: "off",
+        },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 50214 },
+      messageReaction: {
+        chat: { id: 1234, type: "private" },
+        message_id: 4304,
         user: { id: 9, first_name: "Ada" },
         date: 1736380800,
         old_reaction: [],
