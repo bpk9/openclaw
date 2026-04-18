@@ -729,7 +729,7 @@ export async function runHeartbeatOnce(opts: {
     // to stale channels/threads because that base-session event context remains queued.
     turnSource: useIsolatedSession ? undefined : preflight.turnSourceDeliveryContext,
   });
-  if (isTelegramReactionWake && delivery.channel === "none" && !useIsolatedSession) {
+  if (isTelegramReactionWake && (delivery.channel === "none" || !delivery.to) && !useIsolatedSession) {
     const reactionFallbackHeartbeat: HeartbeatConfig = {
       ...(heartbeat ?? {}),
       target: "last",
@@ -741,9 +741,10 @@ export async function runHeartbeatOnce(opts: {
       turnSource: preflight.turnSourceDeliveryContext,
     });
     if (fallbackDelivery.channel !== "none" && fallbackDelivery.to) {
+      const previousDelivery = delivery;
       delivery = fallbackDelivery;
       reactionWakeDiag?.(
-        `[heartbeat-reaction-diag] stage=delivery-fallback reason=telegram-reaction channel=${fallbackDelivery.channel} to=${fallbackDelivery.to}`,
+        `[heartbeat-reaction-diag] stage=delivery-fallback reason=telegram-reaction from_channel=${previousDelivery.channel} from_to=${previousDelivery.to ?? "none"} channel=${fallbackDelivery.channel} to=${fallbackDelivery.to}`,
       );
     }
   }
