@@ -1109,7 +1109,7 @@ export async function runHeartbeatOnce(opts: {
       return { status: "ran", durationMs: Date.now() - startedAt };
     }
 
-    if (!visibility.showAlerts) {
+    if (!visibility.showAlerts && !isTelegramReactionWake) {
       reactionWakeDiag?.(
         `[heartbeat-reaction-diag] stage=outbound-skip reason=alerts-disabled agent=${agentId} session=${runSessionKey}`,
       );
