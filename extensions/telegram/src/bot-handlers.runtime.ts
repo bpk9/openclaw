@@ -69,6 +69,7 @@ import {
   getTelegramTextParts,
   buildTelegramGroupPeerId,
   buildTelegramParentPeer,
+  resolveTelegramDirectPeerId,
   resolveTelegramForumFlag,
   resolveTelegramForumThreadId,
   resolveTelegramGroupAllowFromContext,
@@ -4953,7 +4954,12 @@ export const registerTelegramHandlers = ({
       const resolvedThreadId = isForum
         ? resolveTelegramForumThreadId({ isForum, messageThreadId: undefined })
         : undefined;
-      const peerId = isGroup ? buildTelegramGroupPeerId(chatId, resolvedThreadId) : String(chatId);
+      const peerId = isGroup
+        ? buildTelegramGroupPeerId(chatId, resolvedThreadId)
+        : resolveTelegramDirectPeerId({
+            chatId,
+            senderId: user?.id,
+          });
       const parentPeer = buildTelegramParentPeer({ isGroup, resolvedThreadId, chatId });
       // Fresh config for bindings lookup; other routing inputs are payload-derived.
       const route = resolveAgentRoute({
