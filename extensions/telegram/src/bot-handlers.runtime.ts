@@ -4999,7 +4999,9 @@ export const registerTelegramHandlers = ({
       // When reactionTrigger is enabled, wake the agent so the reaction
       // system events are processed as a standalone turn instead of
       // waiting for the next inbound message.
-      const reactionTrigger = telegramCfg.reactionTrigger === true;
+      const reactionTrigger =
+        telegramCfg.reactionTrigger === true ||
+        (telegramCfg.reactionTrigger == null && telegramCfg.actions?.reactions === true);
       if (reactionTrigger && effectiveAddedReactions.length > 0) {
         requestHeartbeatNow({
           reason: "telegram-reaction",
@@ -5455,7 +5457,10 @@ export const registerTelegramHandlers = ({
         `${reactionDiagPrefix} stage=enqueued session=${sessionKey ?? "default"} summary=${summary} delivery_to=${reactionDeliveryContext.to}`,
       );
 
-      if (telegramCfg.reactionTrigger === true) {
+      if (
+        telegramCfg.reactionTrigger === true ||
+        (telegramCfg.reactionTrigger == null && telegramCfg.actions?.reactions === true)
+      ) {
         requestHeartbeatNow({
           reason: "telegram-reaction",
           sessionKey,
