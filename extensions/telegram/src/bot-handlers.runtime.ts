@@ -2817,8 +2817,13 @@ export const registerTelegramHandlers = ({
         return;
       }
 
-      // Resolve reaction notification mode (default: "own").
-      const reactionMode = telegramCfg.reactionNotifications ?? "own";
+      // Resolve reaction notification mode. When reaction-trigger turns are enabled,
+      // default to "all" so DM reactions are not dropped by stale own-message cache.
+      const reactionTriggerEnabledForMode =
+        telegramCfg.reactionTrigger === true ||
+        (telegramCfg.reactionTrigger == null && telegramCfg.actions?.reactions === true);
+      const reactionMode =
+        telegramCfg.reactionNotifications ?? (reactionTriggerEnabledForMode ? "all" : "own");
       reactionPipelineDiag?.(
         `${reactionDiagPrefix} stage=entry mode=${reactionMode} isGroup=${isGroup} isForum=${isForum}`,
       );
