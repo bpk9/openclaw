@@ -729,12 +729,7 @@ export async function runHeartbeatOnce(opts: {
     // to stale channels/threads because that base-session event context remains queued.
     turnSource: useIsolatedSession ? undefined : preflight.turnSourceDeliveryContext,
   });
-  if (
-    isTelegramReactionWake &&
-    delivery.channel === "none" &&
-    !useIsolatedSession &&
-    preflight.turnSourceDeliveryContext
-  ) {
+  if (isTelegramReactionWake && delivery.channel === "none" && !useIsolatedSession) {
     const reactionFallbackHeartbeat: HeartbeatConfig = {
       ...(heartbeat ?? {}),
       target: "last",
