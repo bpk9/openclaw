@@ -701,7 +701,8 @@ export async function runHeartbeatOnce(opts: {
   // re-schedule this wake automatically.  See #14396 (closed without merge).
   const sessionLaneKey = resolveEmbeddedSessionLane(sessionKey);
   const sessionLaneSize = (opts.deps?.getQueueSize ?? getQueueSize)(sessionLaneKey);
-  if (sessionLaneSize > 0) {
+  const shouldBypassSessionLaneBusyGate = isTelegramReactionWake && isTargetedWake;
+  if (!shouldBypassSessionLaneBusyGate && sessionLaneSize > 0) {
     emitHeartbeatEvent({
       status: "skipped",
       reason: "requests-in-flight",
