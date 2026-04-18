@@ -5134,7 +5134,11 @@ export const registerTelegramHandlers = ({
       const isForum = reactionChat.is_forum === true;
       const reactionDiagPrefix = `[telegram-reaction-count-diag] account=${accountId} chat=${chatId} msg=${messageId}`;
 
-      const reactionMode = telegramCfg.reactionNotifications ?? "own";
+      const reactionTriggerEnabledForMode =
+        telegramCfg.reactionTrigger === true ||
+        (telegramCfg.reactionTrigger == null && telegramCfg.actions?.reactions === true);
+      const reactionMode =
+        telegramCfg.reactionNotifications ?? (reactionTriggerEnabledForMode ? "all" : "own");
       reactionPipelineDiag?.(
         `${reactionDiagPrefix} stage=entry mode=${reactionMode} isGroup=${isGroup} isForum=${isForum}`,
       );
