@@ -427,10 +427,9 @@ function resolveTelegramReactionWakeFallbackText(params: {
   const reactionEvent = params.events.find((event) =>
     event.contextKey?.startsWith("telegram:reaction:"),
   );
-  if (!reactionEvent) {
-    return null;
-  }
-  const base = summarizeTelegramReactionSystemEvent(reactionEvent.text);
+  const base = reactionEvent
+    ? summarizeTelegramReactionSystemEvent(reactionEvent.text)
+    : "I saw your reaction update.";
   if (!base) {
     return null;
   }
@@ -948,7 +947,6 @@ export async function runHeartbeatOnce(opts: {
     const reactionWakeEmptyReplyFallbackText =
       isTelegramReactionWake &&
       canRelayToUser &&
-      pendingReactionEntries.length > 0 &&
       !hasExecCompletion &&
       reasoningPayloads.length === 0 &&
       (!replyPayload || !hasOutboundReplyContent(replyPayload))
@@ -1007,7 +1005,6 @@ export async function runHeartbeatOnce(opts: {
     const reactionWakeFallbackText =
       isTelegramReactionWake &&
       canRelayToUser &&
-      pendingReactionEntries.length > 0 &&
       normalized.shouldSkip &&
       !normalized.hasMedia &&
       !hasExecCompletion &&
