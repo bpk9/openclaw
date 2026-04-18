@@ -398,6 +398,48 @@ function normalizeHeartbeatReply(
   return { shouldSkip: false, text: finalText, hasMedia };
 }
 
+function summarizeTelegramReactionSystemEvent(eventText: string): string {
+  const addedMatch = eventText.match(/^Telegram reaction added:\s*(.+?)\s+by\s+.+?\s+on msg\s+(\d+)/i);
+  if (addedMatch) {
+    const emoji = addedMatch[1]?.trim();
+    const messageId = addedMatch[2]?.trim();
+    if (emoji && messageId) {
+      return `I saw your reaction (${emoji}) on message ${messageId}.`;
+    }
+  }
+
+  const countMatch = eventText.match(/^Telegram reaction count changed on msg\s+(\d+):\s*(.+)$/i);
+  if (countMatch) {
+    const messageId = countMatch[1]?.trim();
+    const summary = countMatch[2]?.trim();
+    if (messageId && summary) {
+      return `I saw reaction activity on message ${messageId} (${summary}).`;
+    }
+  }
+
+  return "I saw your reaction update.";
+}
+
+function resolveTelegramReactionWakeFallbackText(params: {
+  events: ReturnType<typeof peekSystemEventEntries>;
+  responsePrefix?: string;
+}): string | null {
+  const reactionEvent = params.events.find((event) =>
+    event.contextKey?.startsWith("telegram:reaction:"),
+  );
+  if (!reactionEvent) {
+    return null;
+  }
+  const base = summarizeTelegramReactionSystemEvent(reactionEvent.text);
+  if (!base) {
+    return null;
+  }
+  if (!params.responsePrefix || base.startsWith(params.responsePrefix)) {
+    return base;
+  }
+  return `${params.responsePrefix} ${base}`;
+}
+
 type HeartbeatReasonFlags = {
   isExecEventReason: boolean;
   isCronEventReason: boolean;
@@ -641,8 +683,11 @@ export async function runHeartbeatOnce(opts: {
     return { status: "skipped", reason: preflight.skipReason };
   }
   const { entry, sessionKey, storePath } = preflight.session;
+  const pendingReactionEntries = preflight.pendingEventEntries.filter((event) =>
+    event.contextKey?.startsWith("telegram:reaction:"),
+  );
   if (reactionWakeDiag) {
-    const reactionContexts = preflight.pendingEventEntries
+    const reactionContexts = pendingReactionEntries
       .map((event) => event.contextKey ?? "")
       .filter((contextKey) => contextKey.startsWith("telegram:reaction:"));
     reactionWakeDiag(
@@ -939,6 +984,28 @@ export async function runHeartbeatOnce(opts: {
       normalized.text = execFallbackText;
       normalized.shouldSkip = false;
     }
+
+    const reactionWakeFallbackText =
+      isTelegramReactionWake &&
+      canRelayToUser &&
+      pendingReactionEntries.length > 0 &&
+      normalized.shouldSkip &&
+      !normalized.hasMedia &&
+      !hasExecCompletion &&
+      reasoningPayloads.length === 0
+        ? resolveTelegramReactionWakeFallbackText({
+            events: pendingReactionEntries,
+            responsePrefix,
+          })
+        : null;
+    if (reactionWakeFallbackText) {
+      normalized.text = reactionWakeFallbackText;
+      normalized.shouldSkip = false;
+      reactionWakeDiag?.(
+        `[heartbeat-reaction-diag] stage=ok-token-fallback reason=telegram-reaction agent=${agentId} session=${runSessionKey} text_chars=${reactionWakeFallbackText.length}`,
+      );
+    }
+
     const shouldSkipMain = normalized.shouldSkip && !normalized.hasMedia && !hasExecCompletion;
     if (shouldSkipMain && reasoningPayloads.length === 0) {
       reactionWakeDiag?.(
