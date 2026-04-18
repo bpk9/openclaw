@@ -2224,6 +2224,39 @@ describe("createTelegramBot", () => {
     expect(enqueueSystemEventSpy).not.toHaveBeenCalled();
   });
 
+  it("preserves explicit own reaction_count notifications when actions.reactions is enabled", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: {
+          dmPolicy: "open",
+          actions: { reactions: true },
+          reactionNotifications: "own",
+        },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction_count") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 49912 },
+      messageReactionCount: {
+        chat: { id: 1234, type: "private" },
+        message_id: 442,
+        date: 1736380800,
+        reactions: [{ type: "emoji", emoji: FIRE_EMOJI, total_count: 1 }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).not.toHaveBeenCalled();
+  });
+
   it("defaults reaction_count notifications to all when actions.reactions is enabled", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();
@@ -3605,6 +3638,41 @@ describe("createTelegramBot", () => {
       messageReaction: {
         chat: { id: 1234, type: "private" },
         message_id: 4301,
+        user: { id: 9, first_name: "Ada" },
+        date: 1736380800,
+        old_reaction: [],
+        new_reaction: [{ type: "emoji", emoji: THUMBS_UP_EMOJI }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).not.toHaveBeenCalled();
+  });
+
+  it("preserves explicit own reactionNotifications when actions.reactions is enabled", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: {
+          dmPolicy: "open",
+          actions: { reactions: true },
+          reactionNotifications: "own",
+        },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 50212 },
+      messageReaction: {
+        chat: { id: 1234, type: "private" },
+        message_id: 4302,
         user: { id: 9, first_name: "Ada" },
         date: 1736380800,
         old_reaction: [],
