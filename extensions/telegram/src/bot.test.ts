@@ -2191,6 +2191,39 @@ describe("createTelegramBot", () => {
     );
   });
 
+  it("defaults reaction_count notifications to all when actions.reactions is enabled", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", actions: { reactions: true } },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction_count") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 4992 },
+      messageReactionCount: {
+        chat: { id: 1234, type: "private" },
+        message_id: 45,
+        date: 1736380800,
+        reactions: [{ type: "emoji", emoji: FIRE_EMOJI, total_count: 1 }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      `Telegram reaction count changed on msg 45: ${FIRE_EMOJI}:1`,
+      expect.any(Object),
+    );
+  });
+
   it("enqueues reaction_count fallback from camelCase raw envelope", async () => {
     onSpy.mockClear();
     enqueueSystemEventSpy.mockClear();
@@ -3510,6 +3543,41 @@ describe("createTelegramBot", () => {
     expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
     expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
       `Telegram reaction added: ${THUMBS_UP_EMOJI} by Ada on msg 430`,
+      expect.any(Object),
+    );
+  });
+
+  it("defaults reactionNotifications to all when actions.reactions is enabled", async () => {
+    onSpy.mockClear();
+    enqueueSystemEventSpy.mockClear();
+    wasSentByBot.mockReturnValue(false);
+
+    loadConfig.mockReturnValue({
+      channels: {
+        telegram: { dmPolicy: "open", actions: { reactions: true } },
+      },
+    });
+
+    createTelegramBot({ token: "tok" });
+    const handler = getOnHandler("message_reaction") as (
+      ctx: Record<string, unknown>,
+    ) => Promise<void>;
+
+    await handler({
+      update: { update_id: 5022 },
+      messageReaction: {
+        chat: { id: 1234, type: "private" },
+        message_id: 431,
+        user: { id: 9, first_name: "Ada" },
+        date: 1736380800,
+        old_reaction: [],
+        new_reaction: [{ type: "emoji", emoji: THUMBS_UP_EMOJI }],
+      },
+    });
+
+    expect(enqueueSystemEventSpy).toHaveBeenCalledTimes(1);
+    expect(enqueueSystemEventSpy).toHaveBeenCalledWith(
+      `Telegram reaction added: ${THUMBS_UP_EMOJI} by Ada on msg 431`,
       expect.any(Object),
     );
   });
