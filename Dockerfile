@@ -243,9 +243,6 @@ RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw \
  && chmod 755 /app/openclaw.mjs
 
 ENV NODE_ENV=production
-ENV OPENCLAW_TELEGRAM_REACTION_DIAG_HANDLER=1 \
-    OPENCLAW_TELEGRAM_REACTION_DIAG_WAKE=1 \
-    OPENCLAW_TELEGRAM_REACTION_DIAG_HEARTBEAT=1
 
 # Security hardening: Run as non-root user
 # The node:24-bookworm image includes a 'node' user (uid 1000)
