@@ -20,6 +20,8 @@ let replyPayloadsDedupeRuntimePromise: Promise<
   typeof import("./reply-payloads-dedupe.runtime.js")
 > | null = null;
 
+const STRAY_HEARTBEAT_TOKEN_FALLBACK_TEXT = "Got it.";
+
 function loadReplyPayloadsDedupeRuntime() {
   replyPayloadsDedupeRuntimePromise ??= import("./reply-payloads-dedupe.runtime.js");
   return replyPayloadsDedupeRuntimePromise;
@@ -129,7 +131,7 @@ export async function buildReplyPayloads(params: {
         }
         const hasMedia = resolveSendableOutboundReplyParts(payload).hasMedia;
         if (stripped.shouldSkip && !hasMedia) {
-          return [];
+          return [{ ...payload, text: STRAY_HEARTBEAT_TOKEN_FALLBACK_TEXT }];
         }
         return [{ ...payload, text: stripped.text }];
       });

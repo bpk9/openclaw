@@ -24,6 +24,16 @@ async function expectSameTargetRepliesSuppressed(params: { provider: string; to:
 }
 
 describe("buildReplyPayloads media filter integration", () => {
+  it("replaces token-only HEARTBEAT_OK replies with a user-visible fallback on non-heartbeat turns", async () => {
+    const { replyPayloads } = await buildReplyPayloads({
+      ...baseParams,
+      payloads: [{ text: "HEARTBEAT_OK" }],
+    });
+
+    expect(replyPayloads).toHaveLength(1);
+    expect(replyPayloads[0]?.text).toBe("Got it.");
+  });
+
   it("strips media URL from payload when in messagingToolSentMediaUrls", async () => {
     const { replyPayloads } = await buildReplyPayloads({
       ...baseParams,
