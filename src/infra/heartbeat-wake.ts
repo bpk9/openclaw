@@ -3,6 +3,7 @@ import {
   normalizeHeartbeatWakeReason,
   resolveHeartbeatReasonKind,
 } from "./heartbeat-reason.js";
+import { createSubsystemLogger } from "../logging/subsystem.js";
 
 export type HeartbeatRunResult =
   | { status: "ran"; durationMs: number }
@@ -51,6 +52,10 @@ const REASON_PRIORITY = {
   DEFAULT: 2,
   ACTION: 3,
 } as const;
+const log = createSubsystemLogger("gateway/heartbeat");
+const isTelegramReactionWakeDiagEnabled =
+  process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_WAKE === "1" ||
+  process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_HEARTBEAT === "1";
 
 function resolveReasonPriority(reason: string): number {
   const kind = resolveHeartbeatReasonKind(reason);
@@ -68,6 +73,11 @@ function resolveReasonPriority(reason: string): number {
 
 function normalizeWakeReason(reason?: string): string {
   return normalizeHeartbeatWakeReason(reason);
+}
+
+function isTelegramReactionWakeReason(reason?: string): boolean {
+  const normalized = normalizeWakeReason(reason);
+  return normalized === "telegram-reaction" || normalized.startsWith("telegram-reaction:");
 }
 
 function normalizeWakeTarget(value?: string): string | undefined {
@@ -162,7 +172,23 @@ function schedule(coalesceMs: number, kind: WakeTimerKind = "normal") {
           ...(pendingWake.agentId ? { agentId: pendingWake.agentId } : {}),
           ...(pendingWake.sessionKey ? { sessionKey: pendingWake.sessionKey } : {}),
         };
+        if (
+          isTelegramReactionWakeDiagEnabled &&
+          isTelegramReactionWakeReason(pendingWake.reason)
+        ) {
+          log.info(
+            `[heartbeat-reaction-wake-diag] stage=dispatch-start reason=${pendingWake.reason} target=${getWakeTargetKey({ agentId: pendingWake.agentId, sessionKey: pendingWake.sessionKey })} batch_size=${pendingBatch.length}`,
+          );
+        }
         const res = await active(wakeOpts);
+        if (
+          isTelegramReactionWakeDiagEnabled &&
+          isTelegramReactionWakeReason(pendingWake.reason)
+        ) {
+          log.info(
+            `[heartbeat-reaction-wake-diag] stage=dispatch-result reason=${pendingWake.reason} target=${getWakeTargetKey({ agentId: pendingWake.agentId, sessionKey: pendingWake.sessionKey })} status=${res.status} detail=${"reason" in res ? (res.reason ?? "none") : "none"}`,
+          );
+        }
         if (res.status === "skipped" && res.reason === "requests-in-flight") {
           // The main lane is busy; retry this wake target soon.
           queuePendingWakeReason({
@@ -170,6 +196,14 @@ function schedule(coalesceMs: number, kind: WakeTimerKind = "normal") {
             agentId: pendingWake.agentId,
             sessionKey: pendingWake.sessionKey,
           });
+          if (
+            isTelegramReactionWakeDiagEnabled &&
+            isTelegramReactionWakeReason(pendingWake.reason)
+          ) {
+            log.info(
+              `[heartbeat-reaction-wake-diag] stage=dispatch-retry reason=${pendingWake.reason} target=${getWakeTargetKey({ agentId: pendingWake.agentId, sessionKey: pendingWake.sessionKey })} retry_ms=${DEFAULT_RETRY_MS}`,
+            );
+          }
           schedule(DEFAULT_RETRY_MS, "retry");
         }
       }
@@ -181,6 +215,14 @@ function schedule(coalesceMs: number, kind: WakeTimerKind = "normal") {
           agentId: pendingWake.agentId,
           sessionKey: pendingWake.sessionKey,
         });
+        if (
+          isTelegramReactionWakeDiagEnabled &&
+          isTelegramReactionWakeReason(pendingWake.reason)
+        ) {
+          log.info(
+            `[heartbeat-reaction-wake-diag] stage=dispatch-error-retry reason=${pendingWake.reason} target=${getWakeTargetKey({ agentId: pendingWake.agentId, sessionKey: pendingWake.sessionKey })} retry_ms=${DEFAULT_RETRY_MS}`,
+          );
+        }
       }
       schedule(DEFAULT_RETRY_MS, "retry");
     } finally {
@@ -241,11 +283,30 @@ export function requestHeartbeatNow(opts?: {
   agentId?: string;
   sessionKey?: string;
 }) {
+  const normalizedReason = normalizeWakeReason(opts?.reason);
+  const normalizedAgentId = normalizeWakeTarget(opts?.agentId);
+  const normalizedSessionKey = normalizeWakeTarget(opts?.sessionKey);
+  const wakeTargetKey = getWakeTargetKey({
+    agentId: normalizedAgentId,
+    sessionKey: normalizedSessionKey,
+  });
+  const pendingBefore = pendingWakes.get(wakeTargetKey);
   queuePendingWakeReason({
     reason: opts?.reason,
     agentId: opts?.agentId,
     sessionKey: opts?.sessionKey,
   });
+  const pendingAfter = pendingWakes.get(wakeTargetKey);
+  if (
+    isTelegramReactionWakeDiagEnabled &&
+    (isTelegramReactionWakeReason(normalizedReason) ||
+      isTelegramReactionWakeReason(pendingBefore?.reason) ||
+      isTelegramReactionWakeReason(pendingAfter?.reason))
+  ) {
+    log.info(
+      `[heartbeat-reaction-wake-diag] stage=enqueue request_reason=${normalizedReason} selected_reason=${pendingAfter?.reason ?? "none"} target=${wakeTargetKey} replaced=${pendingBefore?.reason && pendingBefore.reason !== pendingAfter?.reason ? "yes" : "no"} pending_total=${pendingWakes.size}`,
+    );
+  }
   schedule(opts?.coalesceMs ?? DEFAULT_COALESCE_MS, "normal");
 }
 
