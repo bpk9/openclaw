@@ -660,8 +660,10 @@ export async function runHeartbeatOnce(opts: {
     return { status: "skipped", reason: "quiet-hours" };
   }
 
+  const isTargetedWake = Boolean(explicitAgentId || opts.sessionKey?.trim());
+  const shouldBypassMainLaneBusyGate = isTelegramReactionWake && isTargetedWake;
   const queueSize = (opts.deps?.getQueueSize ?? getQueueSize)(CommandLane.Main);
-  if (queueSize > 0) {
+  if (!shouldBypassMainLaneBusyGate && queueSize > 0) {
     return { status: "skipped", reason: "requests-in-flight" };
   }
 
