@@ -1,281 +1,337 @@
-import type {
-  AcpRuntimeCapabilities,
-  AcpRuntimeDoctorReport,
-  AcpRuntime,
-  AcpRuntimeEnsureInput,
-  AcpRuntimeHandle,
-  AcpRuntimeStatus,
-  AcpRuntimeTurnInput,
-  PluginLogger,
-} from "../runtime-api.js";
-import { AcpRuntimeError } from "../runtime-api.js";
-import type { ResolvedAcpxPluginConfig } from "./config.js";
-import type { RuntimeHealthReport } from "./health/probe.js";
-import type { SessionRuntimeManager } from "./session/manager.js";
+import {
+  ACPX_BACKEND_ID,
+  AcpxRuntime as BaseAcpxRuntime,
+  createAcpRuntime,
+  createAgentRegistry,
+  createFileSessionStore,
+  decodeAcpxRuntimeHandleState,
+  encodeAcpxRuntimeHandleState,
+  type AcpAgentRegistry,
+  type AcpRuntimeDoctorReport,
+  type AcpRuntimeEvent,
+  type AcpRuntimeHandle,
+  type AcpRuntimeOptions,
+  type AcpRuntimeStatus,
+} from "acpx/runtime";
+import type { AcpRuntime } from "../runtime-api.js";
 
-export const ACPX_BACKEND_ID = "acpx";
+type AcpSessionStore = AcpRuntimeOptions["sessionStore"];
+type AcpSessionRecord = Parameters<AcpSessionStore["save"]>[0];
+type AcpLoadedSessionRecord = Awaited<ReturnType<AcpSessionStore["load"]>>;
 
-const ACPX_RUNTIME_HANDLE_PREFIX = "acpx:v2:";
-const ACPX_CAPABILITIES: AcpRuntimeCapabilities = {
-  controls: ["session/set_mode", "session/set_config_option", "session/status"],
+type ResetAwareSessionStore = AcpSessionStore & {
+  markFresh: (sessionKey: string) => void;
 };
 
-type AcpxHandleState = {
-  name: string;
-  agent: string;
-  cwd: string;
-  mode: "persistent" | "oneshot";
-  acpxRecordId?: string;
-  backendSessionId?: string;
-  agentSessionId?: string;
-};
-
-function asOptionalString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
-}
-
-function writeHandleState(handle: AcpRuntimeHandle, state: AcpxHandleState): void {
-  handle.runtimeSessionName = encodeAcpxRuntimeHandleState(state);
-  handle.cwd = state.cwd;
-  handle.acpxRecordId = state.acpxRecordId;
-  handle.backendSessionId = state.backendSessionId;
-  handle.agentSessionId = state.agentSessionId;
-}
-
-export function encodeAcpxRuntimeHandleState(state: AcpxHandleState): string {
-  const payload = Buffer.from(JSON.stringify(state), "utf8").toString("base64url");
-  return `${ACPX_RUNTIME_HANDLE_PREFIX}${payload}`;
-}
-
-export function decodeAcpxRuntimeHandleState(runtimeSessionName: string): AcpxHandleState | null {
-  const trimmed = runtimeSessionName.trim();
-  if (!trimmed.startsWith(ACPX_RUNTIME_HANDLE_PREFIX)) {
-    return null;
+function readSessionRecordName(record: AcpSessionRecord): string {
+  if (typeof record !== "object" || record === null) {
+    return "";
   }
-  try {
-    const raw = Buffer.from(trimmed.slice(ACPX_RUNTIME_HANDLE_PREFIX.length), "base64url").toString(
-      "utf8",
-    );
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const name = asOptionalString(parsed.name);
-    const agent = asOptionalString(parsed.agent);
-    const cwd = asOptionalString(parsed.cwd);
-    const mode = asOptionalString(parsed.mode);
-    if (!name || !agent || !cwd || (mode !== "persistent" && mode !== "oneshot")) {
-      return null;
+  const { name } = record as { name?: unknown };
+  return typeof name === "string" ? name.trim() : "";
+}
+
+function createResetAwareSessionStore(baseStore: AcpSessionStore): ResetAwareSessionStore {
+  const freshSessionKeys = new Set<string>();
+
+  return {
+    async load(sessionId: string): Promise<AcpLoadedSessionRecord> {
+      const normalized = sessionId.trim();
+      if (normalized && freshSessionKeys.has(normalized)) {
+        return undefined;
+      }
+      return await baseStore.load(sessionId);
+    },
+    async save(record: AcpSessionRecord): Promise<void> {
+      await baseStore.save(record);
+      const sessionName = readSessionRecordName(record);
+      if (sessionName) {
+        freshSessionKeys.delete(sessionName);
+      }
+    },
+    markFresh(sessionKey: string): void {
+      const normalized = sessionKey.trim();
+      if (normalized) {
+        freshSessionKeys.add(normalized);
+      }
+    },
+  };
+}
+
+const OPENCLAW_BRIDGE_EXECUTABLE = "openclaw";
+const OPENCLAW_BRIDGE_SUBCOMMAND = "acp";
+
+function normalizeAgentName(value: string | undefined): string | undefined {
+  const normalized = value?.trim().toLowerCase();
+  return normalized ? normalized : undefined;
+}
+
+function readAgentFromSessionKey(sessionKey: string | undefined): string | undefined {
+  const normalized = sessionKey?.trim();
+  if (!normalized) {
+    return undefined;
+  }
+  const match = /^agent:(?<agent>[^:]+):/i.exec(normalized);
+  return normalizeAgentName(match?.groups?.agent);
+}
+
+function readAgentFromHandle(handle: AcpRuntimeHandle): string | undefined {
+  const decoded = decodeAcpxRuntimeHandleState(handle.runtimeSessionName);
+  if (typeof decoded === "object" && decoded !== null) {
+    const { agent } = decoded as { agent?: unknown };
+    if (typeof agent === "string") {
+      return normalizeAgentName(agent) ?? readAgentFromSessionKey(handle.sessionKey);
     }
-    return {
-      name,
-      agent,
-      cwd,
-      mode,
-      acpxRecordId: asOptionalString(parsed.acpxRecordId),
-      backendSessionId: asOptionalString(parsed.backendSessionId),
-      agentSessionId: asOptionalString(parsed.agentSessionId),
-    };
-  } catch {
-    return null;
   }
+  return readAgentFromSessionKey(handle.sessionKey);
+}
+
+function readAgentCommandFromRecord(record: AcpLoadedSessionRecord): string | undefined {
+  if (typeof record !== "object" || record === null) {
+    return undefined;
+  }
+  const { agentCommand } = record as { agentCommand?: unknown };
+  return typeof agentCommand === "string" ? agentCommand.trim() || undefined : undefined;
+}
+
+function splitCommandParts(value: string): string[] {
+  const parts: string[] = [];
+  let current = "";
+  let quote: "'" | '"' | null = null;
+  let escaping = false;
+
+  for (const ch of value) {
+    if (escaping) {
+      current += ch;
+      escaping = false;
+      continue;
+    }
+    if (ch === "\\" && quote !== "'") {
+      escaping = true;
+      continue;
+    }
+    if (quote) {
+      if (ch === quote) {
+        quote = null;
+      } else {
+        current += ch;
+      }
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      quote = ch;
+      continue;
+    }
+    if (/\s/.test(ch)) {
+      if (current) {
+        parts.push(current);
+        current = "";
+      }
+      continue;
+    }
+    current += ch;
+  }
+
+  if (escaping) {
+    current += "\\";
+  }
+  if (current) {
+    parts.push(current);
+  }
+  return parts;
+}
+
+function basename(value: string): string {
+  return value.split(/[\\/]/).pop() ?? value;
+}
+
+function isEnvAssignment(value: string): boolean {
+  return /^[A-Za-z_][A-Za-z0-9_]*=/.test(value);
+}
+
+function unwrapEnvCommand(parts: string[]): string[] {
+  if (!parts.length || basename(parts[0]) !== "env") {
+    return parts;
+  }
+  let index = 1;
+  while (index < parts.length && isEnvAssignment(parts[index])) {
+    index += 1;
+  }
+  return parts.slice(index);
+}
+
+function isOpenClawBridgeCommand(command: string | undefined): boolean {
+  if (!command) {
+    return false;
+  }
+  const parts = unwrapEnvCommand(splitCommandParts(command.trim()));
+  if (basename(parts[0] ?? "") === OPENCLAW_BRIDGE_EXECUTABLE) {
+    return parts[1] === OPENCLAW_BRIDGE_SUBCOMMAND;
+  }
+  if (basename(parts[0] ?? "") !== "node") {
+    return false;
+  }
+  const scriptName = basename(parts[1] ?? "");
+  return /^openclaw(?:\.[cm]?js)?$/i.test(scriptName) && parts[2] === OPENCLAW_BRIDGE_SUBCOMMAND;
+}
+
+function resolveAgentCommand(params: {
+  agentName: string | undefined;
+  agentRegistry: AcpAgentRegistry;
+}): string | undefined {
+  const normalizedAgentName = normalizeAgentName(params.agentName);
+  if (!normalizedAgentName) {
+    return undefined;
+  }
+  const resolvedCommand = params.agentRegistry.resolve(normalizedAgentName);
+  return typeof resolvedCommand === "string" ? resolvedCommand.trim() || undefined : undefined;
+}
+
+function resolveProbeAgentName(options: AcpRuntimeOptions): string {
+  const { probeAgent } = options as { probeAgent?: unknown };
+  return normalizeAgentName(typeof probeAgent === "string" ? probeAgent : undefined) ?? "codex";
+}
+
+function resolveAgentCommandForName(params: {
+  agentName: string | undefined;
+  agentRegistry: AcpAgentRegistry;
+}): string | undefined {
+  return resolveAgentCommand(params);
+}
+
+function shouldUseBridgeSafeDelegateForCommand(command: string | undefined): boolean {
+  return isOpenClawBridgeCommand(command);
+}
+
+function shouldUseDistinctBridgeDelegate(options: AcpRuntimeOptions): boolean {
+  const { mcpServers } = options as { mcpServers?: unknown };
+  return Array.isArray(mcpServers) && mcpServers.length > 0;
 }
 
 export class AcpxRuntime implements AcpRuntime {
-  private healthy = false;
-  private manager: SessionRuntimeManager | null = null;
-  private managerPromise: Promise<SessionRuntimeManager> | null = null;
+  private readonly sessionStore: ResetAwareSessionStore;
+  private readonly agentRegistry: AcpAgentRegistry;
+  private readonly delegate: BaseAcpxRuntime;
+  private readonly bridgeSafeDelegate: BaseAcpxRuntime;
+  private readonly probeDelegate: BaseAcpxRuntime;
 
   constructor(
-    private readonly config: ResolvedAcpxPluginConfig,
-    private readonly opts?: {
-      logger?: PluginLogger;
-      managerFactory?: (config: ResolvedAcpxPluginConfig) => SessionRuntimeManager;
-    },
-  ) {}
+    options: AcpRuntimeOptions,
+    testOptions?: ConstructorParameters<typeof BaseAcpxRuntime>[1],
+  ) {
+    this.sessionStore = createResetAwareSessionStore(options.sessionStore);
+    this.agentRegistry = options.agentRegistry;
+    const sharedOptions = {
+      ...options,
+      sessionStore: this.sessionStore,
+    };
+    this.delegate = new BaseAcpxRuntime(sharedOptions, testOptions);
+    this.bridgeSafeDelegate = shouldUseDistinctBridgeDelegate(options)
+      ? new BaseAcpxRuntime(
+          {
+            ...sharedOptions,
+            mcpServers: [],
+          },
+          testOptions,
+        )
+      : this.delegate;
+    this.probeDelegate = this.resolveDelegateForAgent(resolveProbeAgentName(options));
+  }
+
+  private resolveDelegateForAgent(agentName: string | undefined): BaseAcpxRuntime {
+    const command = resolveAgentCommandForName({
+      agentName,
+      agentRegistry: this.agentRegistry,
+    });
+    return this.resolveDelegateForCommand(command);
+  }
+
+  private resolveDelegateForCommand(command: string | undefined): BaseAcpxRuntime {
+    return shouldUseBridgeSafeDelegateForCommand(command) ? this.bridgeSafeDelegate : this.delegate;
+  }
+
+  private async resolveDelegateForHandle(handle: AcpRuntimeHandle): Promise<BaseAcpxRuntime> {
+    const record = await this.sessionStore.load(handle.acpxRecordId ?? handle.sessionKey);
+    const recordCommand = readAgentCommandFromRecord(record);
+    if (recordCommand) {
+      return this.resolveDelegateForCommand(recordCommand);
+    }
+    return this.resolveDelegateForAgent(readAgentFromHandle(handle));
+  }
 
   isHealthy(): boolean {
-    return this.healthy;
+    return this.probeDelegate.isHealthy();
   }
 
-  async probeAvailability(): Promise<void> {
-    const report = await this.runProbe();
-    this.healthy = report.ok;
+  probeAvailability(): Promise<void> {
+    return this.probeDelegate.probeAvailability();
   }
 
-  async doctor(): Promise<AcpRuntimeDoctorReport> {
-    const report = await this.runProbe();
-    this.healthy = report.ok;
-    return {
-      ok: report.ok,
-      message: report.message,
-      details: report.details,
-    };
+  doctor(): Promise<AcpRuntimeDoctorReport> {
+    return this.probeDelegate.doctor();
   }
 
-  async ensureSession(input: AcpRuntimeEnsureInput): Promise<AcpRuntimeHandle> {
-    const sessionName = input.sessionKey.trim();
-    if (!sessionName) {
-      throw new AcpRuntimeError("ACP_SESSION_INIT_FAILED", "ACP session key is required.");
-    }
-    const agent = input.agent.trim();
-    if (!agent) {
-      throw new AcpRuntimeError("ACP_SESSION_INIT_FAILED", "ACP agent id is required.");
-    }
+  ensureSession(input: Parameters<AcpRuntime["ensureSession"]>[0]): Promise<AcpRuntimeHandle> {
+    return this.resolveDelegateForAgent(input.agent).ensureSession(input);
+  }
 
-    const manager = await this.getManager();
-    const record = await manager.ensureSession({
-      sessionKey: sessionName,
-      agent,
-      cwd: input.cwd ?? this.config.cwd,
-      resumeSessionId: input.resumeSessionId,
+  async *runTurn(input: Parameters<AcpRuntime["runTurn"]>[0]): AsyncIterable<AcpRuntimeEvent> {
+    yield* (await this.resolveDelegateForHandle(input.handle)).runTurn(input);
+  }
+
+  getCapabilities(): ReturnType<BaseAcpxRuntime["getCapabilities"]> {
+    return this.delegate.getCapabilities();
+  }
+
+  async getStatus(
+    input: Parameters<NonNullable<AcpRuntime["getStatus"]>>[0],
+  ): Promise<AcpRuntimeStatus> {
+    const delegate = await this.resolveDelegateForHandle(input.handle);
+    return delegate.getStatus(input);
+  }
+
+  async setMode(input: Parameters<NonNullable<AcpRuntime["setMode"]>>[0]): Promise<void> {
+    const delegate = await this.resolveDelegateForHandle(input.handle);
+    await delegate.setMode(input);
+  }
+
+  async setConfigOption(
+    input: Parameters<NonNullable<AcpRuntime["setConfigOption"]>>[0],
+  ): Promise<void> {
+    const delegate = await this.resolveDelegateForHandle(input.handle);
+    await delegate.setConfigOption(input);
+  }
+
+  async cancel(input: Parameters<AcpRuntime["cancel"]>[0]): Promise<void> {
+    const delegate = await this.resolveDelegateForHandle(input.handle);
+    await delegate.cancel(input);
+  }
+
+  async prepareFreshSession(input: { sessionKey: string }): Promise<void> {
+    this.sessionStore.markFresh(input.sessionKey);
+  }
+
+  async close(input: Parameters<AcpRuntime["close"]>[0]): Promise<void> {
+    await (
+      await this.resolveDelegateForHandle(input.handle)
+    ).close({
+      handle: input.handle,
+      reason: input.reason,
+      discardPersistentState: input.discardPersistentState,
     });
-
-    const handle: AcpRuntimeHandle = {
-      sessionKey: input.sessionKey,
-      backend: ACPX_BACKEND_ID,
-      runtimeSessionName: "",
-      cwd: record.cwd,
-      acpxRecordId: record.acpxRecordId,
-      backendSessionId: record.acpSessionId,
-      agentSessionId: record.agentSessionId,
-    };
-    writeHandleState(handle, {
-      name: sessionName,
-      agent,
-      cwd: record.cwd,
-      mode: input.mode,
-      acpxRecordId: record.acpxRecordId,
-      backendSessionId: record.acpSessionId,
-      agentSessionId: record.agentSessionId,
-    });
-    return handle;
-  }
-
-  async *runTurn(
-    input: AcpRuntimeTurnInput,
-  ): AsyncIterable<import("../runtime-api.js").AcpRuntimeEvent> {
-    const state = this.resolveHandleState(input.handle);
-    const manager = await this.getManager();
-    yield* manager.runTurn({
-      handle: {
-        ...input.handle,
-        acpxRecordId: state.acpxRecordId ?? input.handle.acpxRecordId ?? input.handle.sessionKey,
-      },
-      text: input.text,
-      attachments: input.attachments,
-      requestId: input.requestId,
-      signal: input.signal,
-    });
-  }
-
-  getCapabilities(): AcpRuntimeCapabilities {
-    return ACPX_CAPABILITIES;
-  }
-
-  async getStatus(input: {
-    handle: AcpRuntimeHandle;
-    signal?: AbortSignal;
-  }): Promise<AcpRuntimeStatus> {
-    const state = this.resolveHandleState(input.handle);
-    const manager = await this.getManager();
-    return await manager.getStatus({
-      ...input.handle,
-      acpxRecordId: state.acpxRecordId ?? input.handle.acpxRecordId ?? input.handle.sessionKey,
-    });
-  }
-
-  async setMode(input: { handle: AcpRuntimeHandle; mode: string }): Promise<void> {
-    const state = this.resolveHandleState(input.handle);
-    const manager = await this.getManager();
-    await manager.setMode(
-      {
-        ...input.handle,
-        acpxRecordId: state.acpxRecordId ?? input.handle.acpxRecordId ?? input.handle.sessionKey,
-      },
-      input.mode,
-    );
-  }
-
-  async setConfigOption(input: {
-    handle: AcpRuntimeHandle;
-    key: string;
-    value: string;
-  }): Promise<void> {
-    const state = this.resolveHandleState(input.handle);
-    const manager = await this.getManager();
-    await manager.setConfigOption(
-      {
-        ...input.handle,
-        acpxRecordId: state.acpxRecordId ?? input.handle.acpxRecordId ?? input.handle.sessionKey,
-      },
-      input.key,
-      input.value,
-    );
-  }
-
-  async cancel(input: { handle: AcpRuntimeHandle; reason?: string }): Promise<void> {
-    const state = this.resolveHandleState(input.handle);
-    const manager = await this.getManager();
-    await manager.cancel({
-      ...input.handle,
-      acpxRecordId: state.acpxRecordId ?? input.handle.acpxRecordId ?? input.handle.sessionKey,
-    });
-  }
-
-  async close(input: { handle: AcpRuntimeHandle; reason: string }): Promise<void> {
-    const state = this.resolveHandleState(input.handle);
-    const manager = await this.getManager();
-    await manager.close({
-      ...input.handle,
-      acpxRecordId: state.acpxRecordId ?? input.handle.acpxRecordId ?? input.handle.sessionKey,
-    });
-  }
-
-  private async getManager(): Promise<SessionRuntimeManager> {
-    if (this.manager) {
-      return this.manager;
+    if (input.discardPersistentState) {
+      this.sessionStore.markFresh(input.handle.sessionKey);
     }
-    if (!this.managerPromise) {
-      this.managerPromise = (async () => {
-        const manager =
-          this.opts?.managerFactory?.(this.config) ??
-          new (await import("./session/manager.js")).SessionRuntimeManager(this.config);
-        this.manager = manager;
-        return manager;
-      })();
-    }
-    return await this.managerPromise;
-  }
-
-  private async runProbe(): Promise<RuntimeHealthReport> {
-    return await (await import("./health/probe.js")).probeEmbeddedRuntime(this.config);
-  }
-
-  private resolveHandleState(handle: AcpRuntimeHandle): AcpxHandleState {
-    const decoded = decodeAcpxRuntimeHandleState(handle.runtimeSessionName);
-    if (decoded) {
-      return {
-        ...decoded,
-        acpxRecordId: decoded.acpxRecordId ?? handle.acpxRecordId,
-        backendSessionId: decoded.backendSessionId ?? handle.backendSessionId,
-        agentSessionId: decoded.agentSessionId ?? handle.agentSessionId,
-      };
-    }
-
-    const runtimeSessionName = handle.runtimeSessionName.trim();
-    if (!runtimeSessionName) {
-      throw new AcpRuntimeError(
-        "ACP_SESSION_INIT_FAILED",
-        "Invalid embedded ACP runtime handle: runtimeSessionName is missing.",
-      );
-    }
-
-    return {
-      name: runtimeSessionName,
-      agent: "codex",
-      cwd: handle.cwd ?? this.config.cwd,
-      mode: "persistent",
-      acpxRecordId: handle.acpxRecordId,
-      backendSessionId: handle.backendSessionId,
-      agentSessionId: handle.agentSessionId,
-    };
   }
 }
+
+export {
+  ACPX_BACKEND_ID,
+  createAcpRuntime,
+  createAgentRegistry,
+  createFileSessionStore,
+  decodeAcpxRuntimeHandleState,
+  encodeAcpxRuntimeHandleState,
+};
+
+export type { AcpAgentRegistry, AcpRuntimeOptions, AcpSessionRecord, AcpSessionStore };

@@ -1,7 +1,9 @@
+import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { ConversationRef } from "../infra/outbound/session-binding-service.js";
-import { normalizeAccountId, normalizeMainKey } from "../routing/session-key.js";
+import { normalizeAccountId } from "../routing/session-key.js";
 import { defaultRuntime } from "../runtime.js";
 import { isCronSessionKey } from "../sessions/session-key-utils.js";
+import { normalizeOptionalLowercaseString } from "../shared/string-coerce.js";
 import {
   mergeDeliveryContext,
   normalizeDeliveryContext,
@@ -23,12 +25,13 @@ import {
   loadConfig,
   loadSessionStore,
   queueEmbeddedPiMessage,
+  resolveActiveEmbeddedRunSessionId,
   resolveAgentIdFromSessionKey,
   resolveConversationIdFromTargets,
   resolveExternalBestEffortDeliveryTarget,
-  resolveMainSessionKey,
   resolveQueueSettings,
   resolveStorePath,
+  sendMessage,
 } from "./subagent-announce-delivery.runtime.js";
 import {
   runSubagentAnnounceDispatch,
@@ -37,7 +40,8 @@ import {
 import { resolveAnnounceOrigin, type DeliveryContext } from "./subagent-announce-origin.js";
 import { type AnnounceQueueItem, enqueueAnnounce } from "./subagent-announce-queue.js";
 import { getSubagentDepthFromSessionStore } from "./subagent-depth.js";
-import type { SpawnSubagentMode } from "./subagent-spawn.js";
+import { resolveRequesterStoreKey } from "./subagent-requester-store-key.js";
+import type { SpawnSubagentMode } from "./subagent-spawn.types.js";
 
 export { resolveAnnounceOrigin } from "./subagent-announce-origin.js";
 
@@ -47,15 +51,104 @@ const MAX_TIMER_SAFE_TIMEOUT_MS = 2_147_000_000;
 type SubagentAnnounceDeliveryDeps = {
   callGateway: typeof callGateway;
   loadConfig: typeof loadConfig;
+  getRequesterSessionActivity: (requesterSessionKey: string) => {
+    sessionId?: string;
+    isActive: boolean;
+  };
+  queueEmbeddedPiMessage: typeof queueEmbeddedPiMessage;
+  sendMessage: typeof sendMessage;
 };
 
 const defaultSubagentAnnounceDeliveryDeps: SubagentAnnounceDeliveryDeps = {
   callGateway,
   loadConfig,
+  getRequesterSessionActivity: (requesterSessionKey: string) => {
+    const sessionId =
+      resolveActiveEmbeddedRunSessionId(requesterSessionKey) ??
+      loadRequesterSessionEntry(requesterSessionKey).entry?.sessionId;
+    return {
+      sessionId,
+      isActive: Boolean(sessionId && isEmbeddedPiRunActive(sessionId)),
+    };
+  },
+  queueEmbeddedPiMessage,
+  sendMessage,
 };
 
 let subagentAnnounceDeliveryDeps: SubagentAnnounceDeliveryDeps =
   defaultSubagentAnnounceDeliveryDeps;
+
+function resolveBoundConversationOrigin(params: {
+  bindingConversation: ConversationRef & { parentConversationId?: string };
+  requesterConversation?: ConversationRef;
+  requesterOrigin?: DeliveryContext;
+}): DeliveryContext {
+  const conversation = params.bindingConversation;
+  const conversationId = conversation.conversationId?.trim() ?? "";
+  const parentConversationId = conversation.parentConversationId?.trim() ?? "";
+  const requesterConversationId = params.requesterConversation?.conversationId?.trim() ?? "";
+  const requesterTo = params.requesterOrigin?.to?.trim();
+  if (
+    conversation.channel === "matrix" &&
+    parentConversationId &&
+    requesterConversationId &&
+    parentConversationId === requesterConversationId &&
+    requesterTo
+  ) {
+    return {
+      channel: conversation.channel,
+      accountId: conversation.accountId,
+      to: requesterTo,
+      ...(conversationId ? { threadId: conversationId } : {}),
+    };
+  }
+
+  const boundTarget = resolveConversationDeliveryTarget({
+    channel: conversation.channel,
+    conversationId,
+    parentConversationId,
+  });
+  const inferredThreadId =
+    boundTarget.threadId ??
+    (parentConversationId && parentConversationId !== conversationId
+      ? conversationId
+      : undefined) ??
+    (params.requesterOrigin?.threadId != null && params.requesterOrigin.threadId !== ""
+      ? String(params.requesterOrigin.threadId)
+      : undefined);
+  if (
+    requesterTo &&
+    conversationId &&
+    requesterConversationId &&
+    conversationId.toLowerCase() === requesterConversationId.toLowerCase()
+  ) {
+    return {
+      channel: conversation.channel,
+      accountId: conversation.accountId,
+      to: requesterTo,
+      threadId: inferredThreadId,
+    };
+  }
+  return {
+    channel: conversation.channel,
+    accountId: conversation.accountId,
+    to: boundTarget.to,
+    threadId: inferredThreadId,
+  };
+}
+
+function resolveRequesterSessionActivity(requesterSessionKey: string) {
+  const activity = subagentAnnounceDeliveryDeps.getRequesterSessionActivity(requesterSessionKey);
+  if (activity.sessionId || activity.isActive) {
+    return activity;
+  }
+  const { entry } = loadRequesterSessionEntry(requesterSessionKey);
+  const sessionId = entry?.sessionId;
+  return {
+    sessionId,
+    isActive: Boolean(sessionId && isEmbeddedPiRunActive(sessionId)),
+  };
+}
 
 function resolveDirectAnnounceTransientRetryDelaysMs() {
   return process.env.OPENCLAW_TEST_FAST === "1"
@@ -63,7 +156,7 @@ function resolveDirectAnnounceTransientRetryDelaysMs() {
     : ([5_000, 10_000, 20_000] as const);
 }
 
-export function resolveSubagentAnnounceTimeoutMs(cfg: ReturnType<typeof loadConfig>): number {
+export function resolveSubagentAnnounceTimeoutMs(cfg: OpenClawConfig): number {
   const configured = cfg.agents?.defaults?.subagents?.announceTimeoutMs;
   if (typeof configured !== "number" || !Number.isFinite(configured)) {
     return DEFAULT_SUBAGENT_ANNOUNCE_TIMEOUT_MS;
@@ -189,7 +282,7 @@ export async function resolveSubagentCompletionOrigin(params: {
   expectsCompletionMessage: boolean;
 }): Promise<DeliveryContext | undefined> {
   const requesterOrigin = normalizeDeliveryContext(params.requesterOrigin);
-  const channel = requesterOrigin?.channel?.trim().toLowerCase();
+  const channel = normalizeOptionalLowercaseString(requesterOrigin?.channel);
   const to = requesterOrigin?.to?.trim();
   const accountId = normalizeAccountId(requesterOrigin?.accountId);
   const threadId =
@@ -212,22 +305,12 @@ export async function resolveSubagentCompletionOrigin(params: {
     failClosed: false,
   });
   if (route.mode === "bound" && route.binding) {
-    const boundTarget = resolveConversationDeliveryTarget({
-      channel: route.binding.conversation.channel,
-      conversationId: route.binding.conversation.conversationId,
-      parentConversationId: route.binding.conversation.parentConversationId,
-    });
     return mergeDeliveryContext(
-      {
-        channel: route.binding.conversation.channel,
-        accountId: route.binding.conversation.accountId,
-        to: boundTarget.to,
-        threadId:
-          boundTarget.threadId ??
-          (requesterOrigin?.threadId != null && requesterOrigin.threadId !== ""
-            ? String(requesterOrigin.threadId)
-            : undefined),
-      },
+      resolveBoundConversationOrigin({
+        bindingConversation: route.binding.conversation,
+        requesterConversation,
+        requesterOrigin,
+      }),
       requesterOrigin,
     );
   }
@@ -302,28 +385,6 @@ async function sendAnnounce(item: AnnounceQueueItem) {
   });
 }
 
-export function resolveRequesterStoreKey(
-  cfg: ReturnType<typeof loadConfig>,
-  requesterSessionKey: string,
-): string {
-  const raw = (requesterSessionKey ?? "").trim();
-  if (!raw) {
-    return raw;
-  }
-  if (raw === "global" || raw === "unknown") {
-    return raw;
-  }
-  if (raw.startsWith("agent:")) {
-    return raw;
-  }
-  const mainKey = normalizeMainKey(cfg.session?.mainKey);
-  if (raw === "main" || raw === mainKey) {
-    return resolveMainSessionKey(cfg);
-  }
-  const agentId = resolveAgentIdFromSessionKey(raw);
-  return `agent:${agentId}:${raw}`;
-}
-
 export function loadRequesterSessionEntry(requesterSessionKey: string) {
   const cfg = subagentAnnounceDeliveryDeps.loadConfig();
   const canonicalKey = resolveRequesterStoreKey(cfg, requesterSessionKey);
@@ -368,7 +429,7 @@ async function maybeQueueSubagentAnnounce(params: {
   }
   const { cfg, entry } = loadRequesterSessionEntry(params.requesterSessionKey);
   const canonicalKey = resolveRequesterStoreKey(cfg, params.requesterSessionKey);
-  const sessionId = entry?.sessionId;
+  const { sessionId, isActive } = resolveRequesterSessionActivity(canonicalKey);
   if (!sessionId) {
     return "none";
   }
@@ -378,11 +439,13 @@ async function maybeQueueSubagentAnnounce(params: {
     channel: entry?.channel ?? entry?.lastChannel ?? entry?.origin?.provider,
     sessionEntry: entry,
   });
-  const isActive = isEmbeddedPiRunActive(sessionId);
 
   const shouldSteer = queueSettings.mode === "steer" || queueSettings.mode === "steer-backlog";
   if (shouldSteer) {
-    const steered = queueEmbeddedPiMessage(sessionId, params.steerMessage);
+    const steered = subagentAnnounceDeliveryDeps.queueEmbeddedPiMessage(
+      sessionId,
+      params.steerMessage,
+    );
     if (steered) {
       return "steered";
     }
@@ -416,6 +479,111 @@ async function maybeQueueSubagentAnnounce(params: {
   }
 
   return "none";
+}
+
+export function extractThreadCompletionFallbackText(internalEvents?: AgentInternalEvent[]): string {
+  if (!internalEvents || internalEvents.length === 0) {
+    return "";
+  }
+  for (const event of internalEvents) {
+    if (event.type !== "task_completion") {
+      continue;
+    }
+    const result = event.result.trim();
+    if (result) {
+      return result;
+    }
+    const statusLabel = event.statusLabel.trim();
+    const taskLabel = event.taskLabel.trim();
+    if (statusLabel && taskLabel) {
+      return `${taskLabel}: ${statusLabel}`;
+    }
+    if (statusLabel) {
+      return statusLabel;
+    }
+    if (taskLabel) {
+      return taskLabel;
+    }
+  }
+  return "";
+}
+
+function hasVisibleGatewayAgentPayload(response: unknown): boolean {
+  const result =
+    response && typeof response === "object" && "result" in response
+      ? (response as { result?: unknown }).result
+      : undefined;
+  const payloads =
+    result && typeof result === "object" && "payloads" in result
+      ? (result as { payloads?: unknown }).payloads
+      : undefined;
+  if (!Array.isArray(payloads)) {
+    return false;
+  }
+  return payloads.some((payload) => {
+    if (!payload || typeof payload !== "object") {
+      return false;
+    }
+    const record = payload as {
+      text?: unknown;
+      mediaUrl?: unknown;
+      mediaUrls?: unknown;
+      presentation?: unknown;
+      interactive?: unknown;
+      channelData?: unknown;
+    };
+    const text = typeof record.text === "string" ? record.text.trim() : "";
+    const mediaUrl = typeof record.mediaUrl === "string" ? record.mediaUrl.trim() : "";
+    const mediaUrls = Array.isArray(record.mediaUrls)
+      ? record.mediaUrls.some((item) => typeof item === "string" && item.trim())
+      : false;
+    return Boolean(
+      text ||
+      mediaUrl ||
+      mediaUrls ||
+      record.presentation ||
+      record.interactive ||
+      record.channelData,
+    );
+  });
+}
+
+async function sendThreadCompletionFallback(params: {
+  cfg: OpenClawConfig;
+  channel?: string;
+  to?: string;
+  accountId?: string;
+  threadId?: string;
+  content: string;
+  requesterSessionKey: string;
+  bestEffortDeliver?: boolean;
+  idempotencyKey: string;
+  signal?: AbortSignal;
+}): Promise<boolean> {
+  const channel = params.channel?.trim();
+  const to = params.to?.trim();
+  const content = params.content.trim();
+  if (!channel || !to || !params.threadId || !content) {
+    return false;
+  }
+  await runAnnounceDeliveryWithRetry({
+    operation: "completion direct thread fallback send",
+    signal: params.signal,
+    run: async () =>
+      await subagentAnnounceDeliveryDeps.sendMessage({
+        cfg: params.cfg,
+        channel,
+        to,
+        accountId: params.accountId,
+        threadId: params.threadId,
+        content,
+        requesterSessionKey: params.requesterSessionKey,
+        bestEffort: params.bestEffortDeliver,
+        idempotencyKey: params.idempotencyKey,
+        abortSignal: params.signal,
+      }),
+  });
+  return true;
 }
 
 async function sendSubagentAnnounceDirectly(params: {
@@ -477,54 +645,124 @@ async function sendSubagentAnnounceDirectly(params: {
       isGatewayMessageChannel(normalizedSessionOnlyOriginChannel)
         ? normalizedSessionOnlyOriginChannel
         : undefined;
+    const requesterActivity = resolveRequesterSessionActivity(canonicalRequesterSessionKey);
+    if (params.expectsCompletionMessage && requesterActivity.sessionId) {
+      const woke = requesterActivity.sessionId
+        ? subagentAnnounceDeliveryDeps.queueEmbeddedPiMessage(
+            requesterActivity.sessionId,
+            params.triggerMessage,
+          )
+        : false;
+      if (woke) {
+        return {
+          delivered: true,
+          path: "steered",
+        };
+      }
+      if (requesterActivity.isActive) {
+        return {
+          delivered: false,
+          path: "direct",
+          error: "active requester session could not be woken",
+        };
+      }
+    }
     if (params.signal?.aborted) {
       return {
         delivered: false,
         path: "none",
       };
     }
-    await runAnnounceDeliveryWithRetry({
-      operation: params.expectsCompletionMessage
-        ? "completion direct announce agent call"
-        : "direct announce agent call",
-      signal: params.signal,
-      run: async () =>
-        await subagentAnnounceDeliveryDeps.callGateway({
-          method: "agent",
-          params: {
-            sessionKey: canonicalRequesterSessionKey,
-            message: params.triggerMessage,
-            deliver: deliveryTarget.deliver,
-            bestEffortDeliver: params.bestEffortDeliver,
-            internalEvents: params.internalEvents,
-            channel: deliveryTarget.deliver ? deliveryTarget.channel : sessionOnlyOriginChannel,
-            accountId: deliveryTarget.deliver
-              ? deliveryTarget.accountId
-              : sessionOnlyOriginChannel
-                ? sessionOnlyOrigin?.accountId
-                : undefined,
-            to: deliveryTarget.deliver
-              ? deliveryTarget.to
-              : sessionOnlyOriginChannel
-                ? sessionOnlyOrigin?.to
-                : undefined,
-            threadId: deliveryTarget.deliver
-              ? deliveryTarget.threadId
-              : sessionOnlyOriginChannel
-                ? sessionOnlyOrigin?.threadId
-                : undefined,
-            inputProvenance: {
-              kind: "inter_session",
-              sourceSessionKey: params.sourceSessionKey,
-              sourceChannel: params.sourceChannel ?? INTERNAL_MESSAGE_CHANNEL,
-              sourceTool: params.sourceTool ?? "subagent_announce",
+    const threadCompletionFallbackText =
+      params.expectsCompletionMessage && deliveryTarget.deliver && deliveryTarget.threadId
+        ? extractThreadCompletionFallbackText(params.internalEvents)
+        : "";
+    let directAnnounceResponse: unknown;
+    try {
+      directAnnounceResponse = await runAnnounceDeliveryWithRetry({
+        operation: params.expectsCompletionMessage
+          ? "completion direct announce agent call"
+          : "direct announce agent call",
+        signal: params.signal,
+        run: async () =>
+          await subagentAnnounceDeliveryDeps.callGateway({
+            method: "agent",
+            params: {
+              sessionKey: canonicalRequesterSessionKey,
+              message: params.triggerMessage,
+              deliver: deliveryTarget.deliver,
+              bestEffortDeliver: params.bestEffortDeliver,
+              internalEvents: params.internalEvents,
+              channel: deliveryTarget.deliver ? deliveryTarget.channel : sessionOnlyOriginChannel,
+              accountId: deliveryTarget.deliver
+                ? deliveryTarget.accountId
+                : sessionOnlyOriginChannel
+                  ? sessionOnlyOrigin?.accountId
+                  : undefined,
+              to: deliveryTarget.deliver
+                ? deliveryTarget.to
+                : sessionOnlyOriginChannel
+                  ? sessionOnlyOrigin?.to
+                  : undefined,
+              threadId: deliveryTarget.deliver
+                ? deliveryTarget.threadId
+                : sessionOnlyOriginChannel
+                  ? sessionOnlyOrigin?.threadId
+                  : undefined,
+              inputProvenance: {
+                kind: "inter_session",
+                sourceSessionKey: params.sourceSessionKey,
+                sourceChannel: params.sourceChannel ?? INTERNAL_MESSAGE_CHANNEL,
+                sourceTool: params.sourceTool ?? "subagent_announce",
+              },
+              idempotencyKey: params.directIdempotencyKey,
             },
-            idempotencyKey: params.directIdempotencyKey,
-          },
-          expectFinal: true,
-          timeoutMs: announceTimeoutMs,
-        }),
-    });
+            expectFinal: true,
+            timeoutMs: announceTimeoutMs,
+          }),
+      });
+    } catch (err) {
+      const didFallback = await sendThreadCompletionFallback({
+        cfg,
+        channel: deliveryTarget.channel,
+        to: deliveryTarget.to,
+        accountId: deliveryTarget.accountId,
+        threadId: deliveryTarget.threadId,
+        content: threadCompletionFallbackText,
+        requesterSessionKey: canonicalRequesterSessionKey,
+        bestEffortDeliver: params.bestEffortDeliver,
+        idempotencyKey: params.directIdempotencyKey,
+        signal: params.signal,
+      });
+      if (didFallback) {
+        return {
+          delivered: true,
+          path: "direct-thread-fallback",
+        };
+      }
+      throw err;
+    }
+
+    if (threadCompletionFallbackText && !hasVisibleGatewayAgentPayload(directAnnounceResponse)) {
+      const didFallback = await sendThreadCompletionFallback({
+        cfg,
+        channel: deliveryTarget.channel,
+        to: deliveryTarget.to,
+        accountId: deliveryTarget.accountId,
+        threadId: deliveryTarget.threadId,
+        content: threadCompletionFallbackText,
+        requesterSessionKey: canonicalRequesterSessionKey,
+        bestEffortDeliver: params.bestEffortDeliver,
+        idempotencyKey: params.directIdempotencyKey,
+        signal: params.signal,
+      });
+      if (didFallback) {
+        return {
+          delivered: true,
+          path: "direct-thread-fallback",
+        };
+      }
+    }
 
     return {
       delivered: true,

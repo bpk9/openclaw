@@ -7,6 +7,18 @@ import {
 } from "../../config/talk.js";
 import type { TalkConfigResponse, TalkProviderConfig } from "../../config/types.gateway.js";
 import type { OpenClawConfig, TtsConfig, TtsProviderConfigMap } from "../../config/types.js";
+import {
+  REALTIME_VOICE_AGENT_CONSULT_TOOL,
+  REALTIME_VOICE_AGENT_CONSULT_TOOL_NAME,
+} from "../../realtime-voice/agent-consult-tool.js";
+import { getRealtimeVoiceProvider } from "../../realtime-voice/provider-registry.js";
+import { resolveConfiguredRealtimeVoiceProvider } from "../../realtime-voice/provider-resolver.js";
+import type { RealtimeVoiceProviderConfig } from "../../realtime-voice/provider-types.js";
+import {
+  normalizeLowercaseStringOrEmpty,
+  normalizeOptionalLowercaseString,
+  normalizeOptionalString,
+} from "../../shared/string-coerce.js";
 import { canonicalizeSpeechProviderId, getSpeechProvider } from "../../tts/provider-registry.js";
 import { synthesizeSpeech, type TtsDirectiveOverrides } from "../../tts/tts.js";
 import { ADMIN_SCOPE, TALK_SECRETS_SCOPE } from "../operator-scopes.js";
@@ -17,9 +29,11 @@ import {
   type TalkSpeakParams,
   validateTalkConfigParams,
   validateTalkModeParams,
+  validateTalkRealtimeSessionParams,
   validateTalkSpeakParams,
 } from "../protocol/index.js";
 import { formatForLog } from "../ws-log.js";
+import { asRecord } from "./record-shared.js";
 import type { GatewayRequestHandlers } from "./types.js";
 
 type TalkSpeakReason =
@@ -38,20 +52,6 @@ function canReadTalkSecrets(client: { connect?: { scopes?: string[] } } | null):
   return scopes.includes(ADMIN_SCOPE) || scopes.includes(TALK_SECRETS_SCOPE);
 }
 
-function trimString(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
 function asStringRecord(value: unknown): Record<string, string> | undefined {
   const record = asRecord(value);
   if (!record) {
@@ -67,7 +67,7 @@ function asStringRecord(value: unknown): Record<string, string> | undefined {
 }
 
 function normalizeAliasKey(value: string): string {
-  return value.trim().toLowerCase();
+  return normalizeLowercaseStringOrEmpty(value);
 }
 
 function resolveTalkVoiceId(
@@ -144,6 +144,61 @@ function buildTalkTtsConfig(
   };
 }
 
+function getRecord(value: unknown): Record<string, unknown> | undefined {
+  return asRecord(value) ?? undefined;
+}
+
+function getVoiceCallRealtimeConfig(config: OpenClawConfig): {
+  provider?: string;
+  providers?: Record<string, RealtimeVoiceProviderConfig>;
+} {
+  const plugins = getRecord(config.plugins);
+  const entries = getRecord(plugins?.entries);
+  const voiceCall = getRecord(entries?.["voice-call"]);
+  const pluginConfig = getRecord(voiceCall?.config);
+  const realtime = getRecord(pluginConfig?.realtime);
+  const providersRaw = getRecord(realtime?.providers);
+  const providers: Record<string, RealtimeVoiceProviderConfig> = {};
+  if (providersRaw) {
+    for (const [providerId, providerConfig] of Object.entries(providersRaw)) {
+      const record = getRecord(providerConfig);
+      if (record) {
+        providers[providerId] = record;
+      }
+    }
+  }
+  return {
+    provider: normalizeOptionalString(realtime?.provider),
+    providers: Object.keys(providers).length > 0 ? providers : undefined,
+  };
+}
+
+function buildTalkRealtimeConfig(config: OpenClawConfig, requestedProvider?: string) {
+  const voiceCallRealtime = getVoiceCallRealtimeConfig(config);
+  const talkProviderConfigs = config.talk?.providers as
+    | Record<string, RealtimeVoiceProviderConfig>
+    | undefined;
+  const talkProvider = normalizeOptionalString(config.talk?.provider);
+  const talkProviderSupportsRealtime = talkProvider
+    ? Boolean(getRealtimeVoiceProvider(talkProvider, config))
+    : false;
+  const provider =
+    normalizeOptionalString(requestedProvider) ??
+    (talkProviderSupportsRealtime ? talkProvider : undefined) ??
+    voiceCallRealtime.provider;
+  return {
+    provider,
+    providers: {
+      ...voiceCallRealtime.providers,
+      ...talkProviderConfigs,
+    },
+  };
+}
+
+function buildRealtimeInstructions(): string {
+  return `You are OpenClaw's realtime voice interface. Keep spoken replies concise. If the user asks for code, repository state, tools, files, current OpenClaw context, or deeper reasoning, call ${REALTIME_VOICE_AGENT_CONSULT_TOOL_NAME} and then summarize the result naturally.`;
+}
+
 function isFallbackEligibleTalkReason(reason: TalkSpeakReason): boolean {
   return (
     reason === "talk_unconfigured" ||
@@ -185,7 +240,10 @@ function buildTalkSpeakOverrides(
     return { provider };
   }
   const resolvedSpeed = resolveTalkSpeed(params);
-  const resolvedVoiceId = resolveTalkVoiceId(providerConfig, trimString(params.voiceId));
+  const resolvedVoiceId = resolveTalkVoiceId(
+    providerConfig,
+    normalizeOptionalString(params.voiceId),
+  );
   const providerOverrides = speechProvider.resolveTalkOverrides({
     talkProviderConfig: providerConfig,
     params: {
@@ -209,8 +267,8 @@ function inferMimeType(
   outputFormat: string | undefined,
   fileExtension: string | undefined,
 ): string | undefined {
-  const normalizedOutput = outputFormat?.trim().toLowerCase();
-  const normalizedExtension = fileExtension?.trim().toLowerCase();
+  const normalizedOutput = normalizeOptionalLowercaseString(outputFormat);
+  const normalizedExtension = normalizeOptionalLowercaseString(fileExtension);
   if (
     normalizedOutput === "mp3" ||
     normalizedOutput?.startsWith("mp3_") ||
@@ -339,6 +397,66 @@ export const talkHandlers: GatewayRequestHandlers = {
 
     respond(true, { config: configPayload }, undefined);
   },
+  "talk.realtime.session": async ({ params, respond }) => {
+    if (!validateTalkRealtimeSessionParams(params)) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          `invalid talk.realtime.session params: ${formatValidationErrors(validateTalkRealtimeSessionParams.errors)}`,
+        ),
+      );
+      return;
+    }
+    const typedParams = params as {
+      provider?: string;
+      model?: string;
+      voice?: string;
+    };
+    try {
+      const runtimeConfig = loadConfig();
+      const realtimeConfig = buildTalkRealtimeConfig(runtimeConfig, typedParams.provider);
+      const resolution = resolveConfiguredRealtimeVoiceProvider({
+        configuredProviderId: realtimeConfig.provider,
+        providerConfigs: realtimeConfig.providers,
+        cfg: runtimeConfig,
+        cfgForResolve: runtimeConfig,
+        noRegisteredProviderMessage: "No realtime voice provider registered",
+      });
+      if (!resolution.provider.createBrowserSession) {
+        respond(
+          false,
+          undefined,
+          errorShape(
+            ErrorCodes.UNAVAILABLE,
+            `Realtime voice provider "${resolution.provider.id}" does not support browser WebRTC sessions`,
+          ),
+        );
+        return;
+      }
+      const session = await resolution.provider.createBrowserSession({
+        providerConfig: resolution.providerConfig,
+        instructions: buildRealtimeInstructions(),
+        tools: [REALTIME_VOICE_AGENT_CONSULT_TOOL],
+        model: normalizeOptionalString(typedParams.model),
+        voice: normalizeOptionalString(typedParams.voice),
+      });
+      respond(
+        true,
+        {
+          provider: session.provider,
+          clientSecret: session.clientSecret,
+          ...(session.model ? { model: session.model } : {}),
+          ...(session.voice ? { voice: session.voice } : {}),
+          ...(typeof session.expiresAt === "number" ? { expiresAt: session.expiresAt } : {}),
+        },
+        undefined,
+      );
+    } catch (err) {
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, formatForLog(err)));
+    }
+  },
   "talk.speak": async ({ params, respond }) => {
     if (!validateTalkSpeakParams(params)) {
       respond(
@@ -353,7 +471,7 @@ export const talkHandlers: GatewayRequestHandlers = {
     }
 
     const typedParams = params;
-    const text = trimString(typedParams.text);
+    const text = normalizeOptionalString(typedParams.text);
     if (!text) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "talk.speak requires text"));
       return;

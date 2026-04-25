@@ -1,4 +1,4 @@
-import { getActivePluginRegistry } from "../plugins/runtime.js";
+import { getPluginRegistryState } from "../plugins/runtime-state.js";
 import { resolveReservedGatewayMethodScope } from "../shared/gateway-method-policy.js";
 import {
   ADMIN_SCOPE,
@@ -42,9 +42,11 @@ const NODE_ROLE_METHODS = new Set([
 const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
   [APPROVALS_SCOPE]: [
     "exec.approval.get",
+    "exec.approval.list",
     "exec.approval.request",
     "exec.approval.waitDecision",
     "exec.approval.resolve",
+    "plugin.approval.list",
     "plugin.approval.request",
     "plugin.approval.waitDecision",
     "plugin.approval.resolve",
@@ -64,7 +66,9 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "node.rename",
   ],
   [READ_SCOPE]: [
+    "assistant.media.get",
     "health",
+    "diagnostics.stability",
     "doctor.memory.status",
     "doctor.memory.dreamDiary",
     "logs.tail",
@@ -74,7 +78,9 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "usage.cost",
     "tts.status",
     "tts.providers",
+    "commands.list",
     "models.list",
+    "models.authStatus",
     "tools.catalog",
     "tools.effective",
     "agents.list",
@@ -87,6 +93,8 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "sessions.get",
     "sessions.preview",
     "sessions.resolve",
+    "sessions.compaction.list",
+    "sessions.compaction.get",
     "sessions.subscribe",
     "sessions.unsubscribe",
     "sessions.messages.subscribe",
@@ -110,12 +118,14 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "agents.files.get",
   ],
   [WRITE_SCOPE]: [
+    "message.action",
     "send",
     "poll",
     "agent",
     "agent.wait",
     "wake",
     "talk.mode",
+    "talk.realtime.session",
     "talk.speak",
     "tts.enable",
     "tts.disable",
@@ -129,10 +139,17 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "sessions.send",
     "sessions.steer",
     "sessions.abort",
+    "sessions.compaction.branch",
+    "doctor.memory.backfillDreamDiary",
+    "doctor.memory.resetDreamDiary",
+    "doctor.memory.resetGroundedShortTerm",
+    "doctor.memory.repairDreamingArtifacts",
+    "doctor.memory.dedupeDreamDiary",
     "push.test",
     "node.pending.enqueue",
   ],
   [ADMIN_SCOPE]: [
+    "channels.start",
     "channels.logout",
     "agents.create",
     "agents.update",
@@ -149,8 +166,10 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "sessions.reset",
     "sessions.delete",
     "sessions.compact",
+    "sessions.compaction.restore",
     "connect",
     "chat.inject",
+    "nativeHook.invoke",
     "web.login.start",
     "web.login.wait",
     "set-heartbeats",
@@ -175,7 +194,7 @@ function resolveScopedMethod(method: string): OperatorScope | undefined {
   if (reservedScope) {
     return reservedScope;
   }
-  const pluginScope = getActivePluginRegistry()?.gatewayMethodScopes?.[method];
+  const pluginScope = getPluginRegistryState()?.activeRegistry?.gatewayMethodScopes?.[method];
   if (pluginScope) {
     return pluginScope;
   }

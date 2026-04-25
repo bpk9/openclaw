@@ -25,8 +25,10 @@ const installRunEmbeddedMocks = () => {
   vi.doMock("../plugins/hook-runner-global.js", () => ({
     getGlobalHookRunner: vi.fn(() => undefined),
   }));
-  vi.doMock("../context-engine/index.js", () => ({
+  vi.doMock("../context-engine/init.js", () => ({
     ensureContextEnginesInitialized: vi.fn(),
+  }));
+  vi.doMock("../context-engine/registry.js", () => ({
     resolveContextEngine: vi.fn(async () => ({
       dispose: async () => undefined,
     })),
@@ -183,9 +185,12 @@ const makeAttempt = (overrides: Partial<EmbeddedRunAttemptResult>): EmbeddedRunA
   const successfulCronAdds = overrides.successfulCronAdds;
   return {
     aborted: false,
+    externalAbort: false,
     timedOut: false,
+    idleTimedOut: false,
     timedOutDuringCompaction: false,
     promptError: null,
+    promptErrorSource: null,
     sessionIdUsed: "session:test",
     systemPromptReport: undefined,
     messagesSnapshot: [],
@@ -326,6 +331,7 @@ const writeAuthStore = async (
   agentDir: string,
   opts?: {
     includeAnthropic?: boolean;
+    order?: Record<string, string[]>;
     usageStats?: Record<
       string,
       {
@@ -339,7 +345,8 @@ const writeAuthStore = async (
   },
 ) => {
   const authPath = path.join(agentDir, "auth-profiles.json");
-  const payload = {
+  const statePath = path.join(agentDir, "auth-state.json");
+  const authPayload = {
     version: 1,
     profiles: {
       "openai:p1": { type: "api_key", provider: "openai", key: "sk-one" },
@@ -348,6 +355,10 @@ const writeAuthStore = async (
         ? { "anthropic:default": { type: "api_key", provider: "anthropic", key: "sk-anth" } }
         : {}),
     },
+  };
+  const statePayload = {
+    version: 1,
+    ...(opts?.order ? { order: opts.order } : {}),
     usageStats:
       opts?.usageStats ??
       ({
@@ -355,7 +366,8 @@ const writeAuthStore = async (
         "openai:p2": { lastUsed: 2 },
       } as Record<string, { lastUsed?: number }>),
   };
-  await fs.writeFile(authPath, JSON.stringify(payload));
+  await fs.writeFile(authPath, JSON.stringify(authPayload));
+  await fs.writeFile(statePath, JSON.stringify(statePayload));
 };
 
 const writeCopilotAuthStore = async (agentDir: string, token = "gh-token") => {
@@ -364,6 +376,21 @@ const writeCopilotAuthStore = async (agentDir: string, token = "gh-token") => {
     version: 1,
     profiles: {
       "github-copilot:github": { type: "token", provider: "github-copilot", token },
+    },
+  };
+  await fs.writeFile(authPath, JSON.stringify(payload));
+};
+
+const writeOpenAiCodexAuthStore = async (agentDir: string) => {
+  const authPath = path.join(agentDir, "auth-profiles.json");
+  const payload = {
+    version: 1,
+    profiles: {
+      "openai-codex:work": {
+        type: "api_key",
+        provider: "openai-codex",
+        key: "sk-codex",
+      },
     },
   };
   await fs.writeFile(authPath, JSON.stringify(payload));
@@ -438,9 +465,7 @@ async function runAutoPinnedOpenAiTurn(params: {
 }
 
 async function readUsageStats(agentDir: string) {
-  const stored = JSON.parse(
-    await fs.readFile(path.join(agentDir, "auth-profiles.json"), "utf-8"),
-  ) as {
+  const stored = JSON.parse(await fs.readFile(path.join(agentDir, "auth-state.json"), "utf-8")) as {
     usageStats?: Record<
       string,
       {
@@ -868,6 +893,8 @@ describe("runEmbeddedPiAgent auth profile rotation", () => {
       decision: "rotate_profile",
       failoverReason: "overloaded",
       profileId: safeProfileId,
+      sourceProvider: "openai",
+      sourceModel: "mock-1",
       providerErrorType: "overloaded_error",
       rawErrorPreview: expect.stringContaining('"request_id":"sha256:'),
     });
@@ -976,15 +1003,25 @@ describe("runEmbeddedPiAgent auth profile rotation", () => {
     });
   });
 
-  it("does not rotate for user-pinned profiles", async () => {
+  it("does not rotate when failover-looking prompt errors came from compaction wait", async () => {
     await withAgentWorkspace(async ({ agentDir, workspaceDir }) => {
       await writeAuthStore(agentDir);
 
-      mockSingleErrorAttempt({ errorMessage: "rate limit" });
+      runEmbeddedAttemptMock.mockResolvedValueOnce(
+        makeAttempt({
+          promptError: new Error("rate limit exceeded"),
+          promptErrorSource: "compaction",
+          assistantTexts: ["partial"],
+          lastAssistant: buildAssistant({
+            stopReason: "stop",
+            content: [{ type: "text", text: "partial" }],
+          }),
+        }),
+      );
 
-      await runEmbeddedPiAgentInline({
+      const result = await runEmbeddedPiAgentInline({
         sessionId: "session:test",
-        sessionKey: "agent:test:user",
+        sessionKey: "agent:test:compaction-wait-abort",
         sessionFile: path.join(workspaceDir, "session.jsonl"),
         workspaceDir,
         agentDir,
@@ -993,9 +1030,45 @@ describe("runEmbeddedPiAgent auth profile rotation", () => {
         provider: "openai",
         model: "mock-1",
         authProfileId: "openai:p1",
-        authProfileIdSource: "user",
+        authProfileIdSource: "auto",
         timeoutMs: 5_000,
-        runId: "run:user",
+        runId: "run:compaction-wait-abort",
+      });
+
+      expect(runEmbeddedAttemptMock).toHaveBeenCalledTimes(1);
+      expect(result.payloads?.[0]?.text).toContain("partial");
+      await expectProfileP2UsageUnchanged(agentDir);
+    });
+  });
+
+  it("surfaces rate limits without rotating for user-pinned profiles", async () => {
+    await withAgentWorkspace(async ({ agentDir, workspaceDir }) => {
+      await writeAuthStore(agentDir);
+
+      mockSingleErrorAttempt({ errorMessage: "rate limit" });
+
+      await expect(
+        runEmbeddedPiAgentInline({
+          sessionId: "session:test",
+          sessionKey: "agent:test:user",
+          sessionFile: path.join(workspaceDir, "session.jsonl"),
+          workspaceDir,
+          agentDir,
+          config: makeConfig(),
+          prompt: "hello",
+          provider: "openai",
+          model: "mock-1",
+          authProfileId: "openai:p1",
+          authProfileIdSource: "user",
+          timeoutMs: 5_000,
+          runId: "run:user",
+        }),
+      ).rejects.toMatchObject({
+        name: "FailoverError",
+        profileId: "openai:p1",
+        reason: "rate_limit",
+        provider: "openai",
+        model: "mock-1",
       });
 
       expect(runEmbeddedAttemptMock).toHaveBeenCalledTimes(1);
@@ -1014,6 +1087,69 @@ describe("runEmbeddedPiAgent auth profile rotation", () => {
     expect(usageStats["openai:p1"]?.cooldownUntil).toBeUndefined();
     expect(usageStats["openai:p1"]?.lastUsed).not.toBe(1);
     expect(usageStats["openai:p2"]?.lastUsed).toBe(2);
+  });
+
+  it("honors user-pinned profiles even when stored order excludes them", async () => {
+    await withAgentWorkspace(async ({ agentDir, workspaceDir }) => {
+      await writeAuthStore(agentDir, {
+        order: {
+          openai: ["openai:p1"],
+        },
+      });
+      mockSingleSuccessfulAttempt();
+
+      await runEmbeddedPiAgentInline({
+        sessionId: "session:test",
+        sessionKey: "agent:test:user-order-excluded",
+        sessionFile: path.join(workspaceDir, "session.jsonl"),
+        workspaceDir,
+        agentDir,
+        config: makeConfig(),
+        prompt: "hello",
+        provider: "openai",
+        model: "mock-1",
+        authProfileId: "openai:p2",
+        authProfileIdSource: "user",
+        timeoutMs: 5_000,
+        runId: "run:user-order-excluded",
+      });
+
+      expect(runEmbeddedAttemptMock).toHaveBeenCalledTimes(1);
+      const usageStats = await readUsageStats(agentDir);
+      expect(usageStats["openai:p1"]?.lastUsed).toBe(1);
+      expect(typeof usageStats["openai:p2"]?.lastUsed).toBe("number");
+      expect(usageStats["openai:p2"]?.lastUsed).not.toBe(2);
+    });
+  });
+
+  it("preserves user-pinned auth profiles across provider aliases", async () => {
+    await withAgentWorkspace(async ({ agentDir, workspaceDir }) => {
+      await writeOpenAiCodexAuthStore(agentDir);
+      mockSingleSuccessfulAttempt();
+
+      await runEmbeddedPiAgentInline({
+        sessionId: "session:test",
+        sessionKey: "agent:test:user-auth-alias",
+        sessionFile: path.join(workspaceDir, "session.jsonl"),
+        workspaceDir,
+        agentDir,
+        config: makeConfig(),
+        prompt: "hello",
+        provider: "codex-cli",
+        model: "gpt-5.4",
+        authProfileId: "openai-codex:work",
+        authProfileIdSource: "user",
+        timeoutMs: 5_000,
+        runId: "run:user-auth-alias",
+      });
+
+      expect(runEmbeddedAttemptMock).toHaveBeenCalledTimes(1);
+      expect(runEmbeddedAttemptMock.mock.calls[0]?.[0]).toMatchObject({
+        authProfileId: "openai-codex:work",
+        authProfileIdSource: "user",
+        provider: "codex-cli",
+      });
+    });
   });
 
   it("ignores user-locked profile when provider mismatches", async () => {
@@ -1319,7 +1455,9 @@ describe("runEmbeddedPiAgent auth profile rotation", () => {
     try {
       await withAgentWorkspace(async ({ agentDir, workspaceDir }) => {
         const authPath = path.join(agentDir, "auth-profiles.json");
-        await fs.writeFile(authPath, JSON.stringify({ version: 1, profiles: {}, usageStats: {} }));
+        const authStatePath = path.join(agentDir, "auth-state.json");
+        await fs.writeFile(authPath, JSON.stringify({ version: 1, profiles: {} }));
+        await fs.writeFile(authStatePath, JSON.stringify({ version: 1, usageStats: {} }));
 
         await expect(
           runEmbeddedPiAgentInline({

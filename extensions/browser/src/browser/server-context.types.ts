@@ -1,7 +1,6 @@
 import type { Server } from "node:http";
 import type { RunningChrome } from "./chrome.js";
-import type { BrowserTransport } from "./client.js";
-import type { BrowserTab } from "./client.js";
+import type { BrowserTab, BrowserTransport } from "./client.types.js";
 import type { ResolvedBrowserConfig, ResolvedBrowserProfile } from "./config.js";
 
 export type { BrowserTab };
@@ -14,6 +13,11 @@ export type ProfileRuntimeState = {
   running: RunningChrome | null;
   /** Sticky tab selection when callers omit targetId (keeps snapshot+act consistent). */
   lastTargetId?: string | null;
+  /** Stable, user-facing tab aliases scoped to this profile runtime. */
+  tabAliases?: {
+    nextTabNumber: number;
+    byTargetId: Record<string, { tabId: string; label?: string }>;
+  };
   reconcile?: {
     previousProfile: ResolvedBrowserProfile;
     reason: string;
@@ -25,6 +29,7 @@ export type BrowserServerState = {
   port: number;
   resolved: ResolvedBrowserConfig;
   profiles: Map<string, ProfileRuntimeState>;
+  stopTrackedTabCleanup?: () => void;
 };
 
 type BrowserProfileActions = {
@@ -33,7 +38,8 @@ type BrowserProfileActions = {
   isHttpReachable: (timeoutMs?: number) => Promise<boolean>;
   isReachable: (timeoutMs?: number) => Promise<boolean>;
   listTabs: () => Promise<BrowserTab[]>;
-  openTab: (url: string) => Promise<BrowserTab>;
+  openTab: (url: string, opts?: { label?: string }) => Promise<BrowserTab>;
+  labelTab: (targetId: string, label: string) => Promise<BrowserTab>;
   focusTab: (targetId: string) => Promise<void>;
   closeTab: (targetId: string) => Promise<void>;
   stopRunningBrowser: () => Promise<{ stopped: boolean }>;

@@ -1,3 +1,9 @@
+import os from "node:os";
+import path from "node:path";
+import {
+  normalizeOptionalString,
+  normalizeOptionalTrimmedStringList,
+} from "openclaw/plugin-sdk/text-runtime";
 import {
   type BrowserConfig,
   type BrowserProfileConfig,
@@ -16,6 +22,9 @@ import {
   DEFAULT_AI_SNAPSHOT_MAX_CHARS,
   DEFAULT_BROWSER_DEFAULT_PROFILE_NAME,
   DEFAULT_BROWSER_EVALUATE_ENABLED,
+  DEFAULT_BROWSER_TAB_CLEANUP_IDLE_MINUTES,
+  DEFAULT_BROWSER_TAB_CLEANUP_MAX_TABS_PER_SESSION,
+  DEFAULT_BROWSER_TAB_CLEANUP_SWEEP_MINUTES,
   DEFAULT_OPENCLAW_BROWSER_COLOR,
   DEFAULT_OPENCLAW_BROWSER_ENABLED,
   DEFAULT_OPENCLAW_BROWSER_PROFILE_NAME,
@@ -38,6 +47,14 @@ export {
 export type { BrowserControlAuth };
 export { parseBrowserHttpUrl as parseHttpUrl };
 
+type BrowserSsrFPolicyCompat = NonNullable<BrowserConfig["ssrfPolicy"]> & {
+  /**
+   * Legacy raw-config alias. Keep it out of the public BrowserConfig type while
+   * still accepting old user files until doctor rewrites them.
+   */
+  allowPrivateNetwork?: boolean;
+};
+
 export type ResolvedBrowserConfig = {
   enabled: boolean;
   evaluateEnabled: boolean;
@@ -56,8 +73,16 @@ export type ResolvedBrowserConfig = {
   attachOnly: boolean;
   defaultProfile: string;
   profiles: Record<string, BrowserProfileConfig>;
+  tabCleanup: ResolvedBrowserTabCleanupConfig;
   ssrfPolicy?: SsrFPolicy;
   extraArgs: string[];
+};
+
+export type ResolvedBrowserTabCleanupConfig = {
+  enabled: boolean;
+  idleMinutes: number;
+  maxTabsPerSession: number;
+  sweepMinutes: number;
 };
 
 export type ResolvedBrowserProfile = {
@@ -69,6 +94,7 @@ export type ResolvedBrowserProfile = {
   userDataDir?: string;
   color: string;
   driver: "openclaw" | "existing-session";
+  headless: boolean;
   attachOnly: boolean;
 };
 
@@ -89,6 +115,48 @@ function normalizeHexColor(raw: string | undefined): string {
 function normalizeTimeoutMs(raw: number | undefined, fallback: number): number {
   const value = typeof raw === "number" && Number.isFinite(raw) ? Math.floor(raw) : fallback;
   return value < 0 ? fallback : value;
+}
+
+function normalizeNonNegativeInteger(raw: number | undefined, fallback: number): number {
+  const value = typeof raw === "number" && Number.isFinite(raw) ? Math.floor(raw) : fallback;
+  return value < 0 ? fallback : value;
+}
+
+function normalizePositiveInteger(raw: number | undefined, fallback: number): number {
+  const value = typeof raw === "number" && Number.isFinite(raw) ? Math.floor(raw) : fallback;
+  return value <= 0 ? fallback : value;
+}
+
+function normalizeExecutablePath(raw: string | undefined): string | undefined {
+  const value = normalizeOptionalString(raw);
+  if (!value) {
+    return undefined;
+  }
+  if (!/^~(?=$|[\\/])/.test(value)) {
+    return value;
+  }
+  return path.resolve(value.replace(/^~(?=$|[\\/])/, os.homedir()));
+}
+
+function resolveBrowserTabCleanupConfig(
+  cfg: BrowserConfig | undefined,
+): ResolvedBrowserTabCleanupConfig {
+  const raw = cfg?.tabCleanup;
+  return {
+    enabled: raw?.enabled ?? true,
+    idleMinutes: normalizeNonNegativeInteger(
+      raw?.idleMinutes,
+      DEFAULT_BROWSER_TAB_CLEANUP_IDLE_MINUTES,
+    ),
+    maxTabsPerSession: normalizeNonNegativeInteger(
+      raw?.maxTabsPerSession,
+      DEFAULT_BROWSER_TAB_CLEANUP_MAX_TABS_PER_SESSION,
+    ),
+    sweepMinutes: normalizePositiveInteger(
+      raw?.sweepMinutes,
+      DEFAULT_BROWSER_TAB_CLEANUP_SWEEP_MINUTES,
+    ),
+  };
 }
 
 function resolveCdpPortRangeStart(
@@ -112,20 +180,10 @@ function resolveCdpPortRangeStart(
   return start;
 }
 
-function normalizeStringList(raw: string[] | undefined): string[] | undefined {
-  if (!Array.isArray(raw) || raw.length === 0) {
-    return undefined;
-  }
-  const values = raw
-    .map((value) => value.trim())
-    .filter((value): value is string => value.length > 0);
-  return values.length > 0 ? values : undefined;
-}
+const normalizeStringList = normalizeOptionalTrimmedStringList;
 
 function resolveBrowserSsrFPolicy(cfg: BrowserConfig | undefined): SsrFPolicy | undefined {
-  const rawPolicy = cfg?.ssrfPolicy as
-    | (BrowserConfig["ssrfPolicy"] & { allowPrivateNetwork?: boolean })
-    | undefined;
+  const rawPolicy = cfg?.ssrfPolicy as BrowserSsrFPolicyCompat | undefined;
   const allowPrivateNetwork = rawPolicy?.allowPrivateNetwork;
   const dangerouslyAllowPrivateNetwork = rawPolicy?.dangerouslyAllowPrivateNetwork;
   const allowedHostnames = normalizeStringList(rawPolicy?.allowedHostnames);
@@ -133,9 +191,7 @@ function resolveBrowserSsrFPolicy(cfg: BrowserConfig | undefined): SsrFPolicy | 
   const hasExplicitPrivateSetting =
     allowPrivateNetwork !== undefined || dangerouslyAllowPrivateNetwork !== undefined;
   const resolvedAllowPrivateNetwork =
-    dangerouslyAllowPrivateNetwork === true ||
-    allowPrivateNetwork === true ||
-    !hasExplicitPrivateSetting;
+    dangerouslyAllowPrivateNetwork === true || allowPrivateNetwork === true;
 
   if (
     !resolvedAllowPrivateNetwork &&
@@ -143,11 +199,17 @@ function resolveBrowserSsrFPolicy(cfg: BrowserConfig | undefined): SsrFPolicy | 
     !allowedHostnames &&
     !hostnameAllowlist
   ) {
-    return undefined;
+    // Keep the default policy object present so CDP guards still enforce
+    // fail-closed private-network checks on unconfigured installs.
+    return {};
   }
 
   return {
-    ...(resolvedAllowPrivateNetwork ? { dangerouslyAllowPrivateNetwork: true } : {}),
+    ...(resolvedAllowPrivateNetwork ||
+    dangerouslyAllowPrivateNetwork === false ||
+    allowPrivateNetwork === false
+      ? { dangerouslyAllowPrivateNetwork: resolvedAllowPrivateNetwork }
+      : {}),
     ...(allowedHostnames ? { allowedHostnames } : {}),
     ...(hostnameAllowlist ? { hostnameAllowlist } : {}),
   };
@@ -238,8 +300,8 @@ export function resolveBrowserConfig(
   const headless = cfg?.headless === true;
   const noSandbox = cfg?.noSandbox === true;
   const attachOnly = cfg?.attachOnly === true;
-  const executablePath = cfg?.executablePath?.trim() || undefined;
-  const defaultProfileFromConfig = cfg?.defaultProfile?.trim() || undefined;
+  const executablePath = normalizeExecutablePath(cfg?.executablePath);
+  const defaultProfileFromConfig = normalizeOptionalString(cfg?.defaultProfile);
 
   const legacyCdpPort = rawCdpUrl ? cdpInfo.port : undefined;
   const isWsUrl = cdpInfo.parsed.protocol === "ws:" || cdpInfo.parsed.protocol === "wss:";
@@ -287,6 +349,7 @@ export function resolveBrowserConfig(
     attachOnly,
     defaultProfile,
     profiles,
+    tabCleanup: resolveBrowserTabCleanupConfig(cfg),
     ssrfPolicy: resolveBrowserSsrFPolicy(cfg),
     extraArgs,
   };
@@ -306,6 +369,7 @@ export function resolveProfile(
   let cdpPort = profile.cdpPort ?? 0;
   let cdpUrl = "";
   const driver = profile.driver === "existing-session" ? "existing-session" : "openclaw";
+  const headless = profile.headless ?? resolved.headless;
 
   if (driver === "existing-session") {
     return {
@@ -317,6 +381,7 @@ export function resolveProfile(
       userDataDir: resolveUserPath(profile.userDataDir?.trim() || "") || undefined,
       color: profile.color,
       driver,
+      headless,
       attachOnly: true,
     };
   }
@@ -350,6 +415,7 @@ export function resolveProfile(
     cdpIsLoopback: isLoopbackHost(cdpHost),
     color: profile.color,
     driver,
+    headless,
     attachOnly: profile.attachOnly ?? resolved.attachOnly,
   };
 }

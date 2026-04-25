@@ -2,15 +2,9 @@ import type * as ConversationRuntime from "openclaw/plugin-sdk/conversation-runt
 import type { ResolvedAgentRoute } from "openclaw/plugin-sdk/routing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createRuntimeEnv } from "../../../test/helpers/plugins/runtime-env.js";
-import type { ClawdbotConfig, PluginRuntime, RuntimeEnv } from "../runtime-api.js";
+import type { ClawdbotConfig, PluginRuntime } from "../runtime-api.js";
 import type { FeishuMessageEvent } from "./bot.js";
-import {
-  buildBroadcastSessionKey,
-  buildFeishuAgentBody,
-  handleFeishuMessage,
-  resolveBroadcastAgents,
-  toMessageResourceType,
-} from "./bot.js";
+import { handleFeishuMessage } from "./bot.js";
 import { setFeishuRuntime } from "./runtime.js";
 
 type ConfiguredBindingRoute = ReturnType<typeof ConversationRuntime.resolveConfiguredBindingRoute>;
@@ -166,7 +160,7 @@ function buildDefaultResolveRoute(): ResolvedAgentRoute {
   };
 }
 
-function createUnboundConfiguredRoute(
+function _createUnboundConfiguredRoute(
   route: NonNullable<ConfiguredBindingRoute>["route"],
 ): ConfiguredBindingRoute {
   return { bindingResolution: null, route };
@@ -202,7 +196,7 @@ function createFeishuBotRuntime(overrides: DeepPartial<PluginRuntime> = {}): Plu
         upsertPairingRequest: vi.fn(),
         buildPairingReply: vi.fn(),
       },
-      ...(overrides.channel ?? {}),
+      ...overrides.channel,
     },
     ...(overrides.system ? { system: overrides.system as PluginRuntime["system"] } : {}),
     ...(overrides.media ? { media: overrides.media as PluginRuntime["media"] } : {}),
@@ -268,7 +262,7 @@ const {
   mockEnsureConfiguredBindingRouteReady: vi.fn(
     async (_params?: unknown): Promise<BindingReadiness> => ({ ok: true }),
   ),
-  mockResolveBoundConversation: vi.fn(() => null as BoundConversation),
+  mockResolveBoundConversation: vi.fn((_ref?: unknown) => null as BoundConversation),
   mockTouchBinding: vi.fn(),
   mockResolveFeishuReasoningPreviewEnabled: vi.fn(() => false),
 }));
@@ -303,6 +297,30 @@ vi.mock("openclaw/plugin-sdk/conversation-runtime", async () => {
     ...actual,
     resolveConfiguredBindingRoute: (params: unknown) =>
       mockResolveConfiguredBindingRoute(params as { route: ResolvedAgentRoute }),
+    resolveRuntimeConversationBindingRoute: (params: {
+      route: ResolvedAgentRoute;
+      conversation: Parameters<
+        ReturnType<typeof actual.getSessionBindingService>["resolveByConversation"]
+      >[0];
+    }) => {
+      const bindingRecord = mockResolveBoundConversation(params.conversation);
+      const boundSessionKey = bindingRecord?.targetSessionKey?.trim();
+      if (!bindingRecord || !boundSessionKey) {
+        return { bindingRecord: null, route: params.route };
+      }
+      mockTouchBinding(bindingRecord.bindingId);
+      return {
+        bindingRecord,
+        boundSessionKey,
+        boundAgentId: params.route.agentId,
+        route: {
+          ...params.route,
+          sessionKey: boundSessionKey,
+          lastRoutePolicy: boundSessionKey === params.route.mainSessionKey ? "main" : "session",
+          matchedBy: "binding.channel",
+        },
+      };
+    },
     ensureConfiguredBindingRouteReady: (params: unknown) =>
       mockEnsureConfiguredBindingRouteReady(params),
     getSessionBindingService: () => ({

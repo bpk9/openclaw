@@ -2,6 +2,7 @@ import {
   defineBundledChannelEntry,
   loadBundledEntryExportSync,
 } from "openclaw/plugin-sdk/channel-entry-contract";
+import type { PluginRuntime, ResolvedNostrAccount } from "./api.js";
 
 function createNostrProfileHttpHandler() {
   return loadBundledEntryExportSync<
@@ -13,20 +14,19 @@ function createNostrProfileHttpHandler() {
 }
 
 function getNostrRuntime() {
-  return loadBundledEntryExportSync<() => any>(import.meta.url, {
+  return loadBundledEntryExportSync<() => PluginRuntime>(import.meta.url, {
     specifier: "./api.js",
     exportName: "getNostrRuntime",
   })();
 }
 
 function resolveNostrAccount(params: { cfg: unknown; accountId: string }) {
-  return loadBundledEntryExportSync<(params: { cfg: unknown; accountId: string }) => any>(
-    import.meta.url,
-    {
-      specifier: "./api.js",
-      exportName: "resolveNostrAccount",
-    },
-  )(params);
+  return loadBundledEntryExportSync<
+    (params: { cfg: unknown; accountId: string }) => ResolvedNostrAccount
+  >(import.meta.url, {
+    specifier: "./api.js",
+    exportName: "resolveNostrAccount",
+  })(params);
 }
 
 export default defineBundledChannelEntry({
@@ -35,7 +35,7 @@ export default defineBundledChannelEntry({
   description: "Nostr DM channel plugin via NIP-04",
   importMetaUrl: import.meta.url,
   plugin: {
-    specifier: "./api.js",
+    specifier: "./channel-plugin-api.js",
     exportName: "nostrPlugin",
   },
   runtime: {
@@ -87,6 +87,7 @@ export default defineBundledChannelEntry({
       path: "/api/channels/nostr",
       auth: "gateway",
       match: "prefix",
+      gatewayRuntimeScopeSurface: "trusted-operator",
       handler: httpHandler,
     });
   },

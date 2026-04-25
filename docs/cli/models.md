@@ -3,7 +3,7 @@ summary: "CLI reference for `openclaw models` (status/list/set/scan, aliases, fa
 read_when:
   - You want to change default models or view provider auth status
   - You want to scan available models/providers and debug auth profiles
-title: "models"
+title: "Models"
 ---
 
 # `openclaw models`
@@ -13,6 +13,7 @@ Model discovery, scanning, and configuration (default model, fallbacks, auth pro
 Related:
 
 - Providers + models: [Models](/providers/models)
+- Model selection concepts + `/models` slash command: [Models concept](/concepts/models)
 - Provider auth setup: [Getting started](/start/getting-started)
 
 ## Common commands
@@ -43,6 +44,15 @@ Probe rows can come from auth profiles, env credentials, or `models.json`.
 Notes:
 
 - `models set <model-or-alias>` accepts `provider/model` or an alias.
+- `models list` is read-only: it reads config, auth profiles, existing catalog
+  state, and provider-owned catalog rows, but it does not rewrite
+  `models.json`.
+- `models list --all` includes bundled provider-owned static catalog rows even
+  when you have not authenticated with that provider yet. Those rows still show
+  as unavailable until matching auth is configured.
+- `models list --provider <id>` filters by provider id, such as `moonshot` or
+  `openai-codex`. It does not accept display labels from interactive provider
+  pickers, such as `Moonshot AI`.
 - Model refs are parsed by splitting on the **first** `/`. If the model ID includes `/` (OpenRouter-style), include the provider prefix (example: `openrouter/moonshotai/kimi-k2`).
 - If you omit the provider, OpenClaw resolves the input as an alias first, then
   as a unique configured-provider match for that exact model id, and only then
@@ -130,5 +140,11 @@ Notes:
   `--profile-id`.
 - `paste-token --expires-in <duration>` stores an absolute token expiry from a
   relative duration such as `365d` or `12h`.
-- Anthropic billing note: for Anthropic in OpenClaw, the practical split is **API key** or **Claude subscription with Extra Usage**. Anthropic notified OpenClaw users on **April 4, 2026 at 12:00 PM PT / 8:00 PM BST** that the **OpenClaw** Claude-login path counts as third-party harness usage and requires **Extra Usage** billed separately from the subscription. Our local repros also show the OpenClaw-identifying prompt string does not reproduce on the Anthropic SDK + API-key path.
-- Anthropic `setup-token` / `paste-token` are available again as a legacy/manual OpenClaw path. Use them with the expectation that Anthropic told OpenClaw users this path requires **Extra Usage**.
+- Anthropic note: Anthropic staff told us OpenClaw-style Claude CLI usage is allowed again, so OpenClaw treats Claude CLI reuse and `claude -p` usage as sanctioned for this integration unless Anthropic publishes a new policy.
+- Anthropic `setup-token` / `paste-token` remain available as a supported OpenClaw token path, but OpenClaw now prefers Claude CLI reuse and `claude -p` when available.
+
+## Related
+
+- [CLI reference](/cli)
+- [Model selection](/concepts/model-providers)
+- [Model failover](/concepts/model-failover)

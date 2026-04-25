@@ -7,6 +7,7 @@ import type {
   SlackChannelStreamingConfig,
   TextChunkMode,
 } from "../config/types.base.js";
+import { normalizeOptionalLowercaseString } from "../shared/string-coerce.js";
 
 export type {
   ChannelDeliveryStreamingConfig,
@@ -21,6 +22,7 @@ export type {
 
 type StreamingCompatEntry = {
   streaming?: unknown;
+  streamMode?: unknown;
   chunkMode?: unknown;
   blockStreaming?: unknown;
   draftChunk?: unknown;
@@ -40,6 +42,27 @@ function asTextChunkMode(value: unknown): TextChunkMode | undefined {
 
 function asBoolean(value: unknown): boolean | undefined {
   return typeof value === "boolean" ? value : undefined;
+}
+
+function normalizeStreamingMode(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = normalizeOptionalLowercaseString(value);
+  return normalized || null;
+}
+
+function parsePreviewStreamingMode(value: unknown): "off" | "partial" | "block" | null {
+  const normalized = normalizeStreamingMode(value);
+  if (
+    normalized === "off" ||
+    normalized === "partial" ||
+    normalized === "block" ||
+    normalized === "progress"
+  ) {
+    return normalized === "progress" ? "partial" : normalized;
+  }
+  return null;
 }
 
 function asBlockStreamingCoalesceConfig(value: unknown): BlockStreamingCoalesceConfig | undefined {
@@ -93,9 +116,38 @@ export function resolveChannelStreamingPreviewChunk(
   );
 }
 
+export function resolveChannelStreamingPreviewToolProgress(
+  entry: StreamingCompatEntry | null | undefined,
+  defaultValue = true,
+): boolean {
+  const config = getChannelStreamingConfigObject(entry);
+  return asBoolean(config?.preview?.toolProgress) ?? defaultValue;
+}
+
 export function resolveChannelStreamingNativeTransport(
   entry: StreamingCompatEntry | null | undefined,
 ): boolean | undefined {
   const config = getChannelStreamingConfigObject(entry);
   return asBoolean(config?.nativeTransport) ?? asBoolean(entry?.nativeStreaming);
+}
+
+export function resolveChannelPreviewStreamMode(
+  entry: StreamingCompatEntry | null | undefined,
+  defaultMode: "off" | "partial",
+): "off" | "partial" | "block" {
+  const parsedStreaming = parsePreviewStreamingMode(
+    getChannelStreamingConfigObject(entry)?.mode ?? entry?.streaming,
+  );
+  if (parsedStreaming) {
+    return parsedStreaming;
+  }
+
+  const legacy = parsePreviewStreamingMode(entry?.streamMode);
+  if (legacy) {
+    return legacy;
+  }
+  if (typeof entry?.streaming === "boolean") {
+    return entry.streaming ? "partial" : "off";
+  }
+  return defaultMode;
 }

@@ -32,9 +32,11 @@ describe("method scope resolution", () => {
     ["sessions.abort", ["operator.write"]],
     ["sessions.messages.subscribe", ["operator.read"]],
     ["sessions.messages.unsubscribe", ["operator.read"]],
+    ["diagnostics.stability", ["operator.read"]],
     ["node.pair.approve", ["operator.pairing"]],
     ["poll", ["operator.write"]],
     ["config.patch", ["operator.admin"]],
+    ["nativeHook.invoke", ["operator.admin"]],
     ["wizard.start", ["operator.admin"]],
     ["update.run", ["operator.admin"]],
   ])("resolves least-privilege scopes for %s", (method, expected) => {
@@ -97,7 +99,7 @@ describe("operator scope authorization", () => {
     });
   });
 
-  it.each(["exec.approval.get", "exec.approval.resolve"])(
+  it.each(["exec.approval.get", "exec.approval.list", "exec.approval.resolve"])(
     "requires approvals scope for %s",
     (method) => {
       expect(authorizeOperatorScopesForMethod(method, ["operator.write"])).toEqual({
@@ -110,18 +112,20 @@ describe("operator scope authorization", () => {
     },
   );
 
-  it.each(["plugin.approval.request", "plugin.approval.waitDecision", "plugin.approval.resolve"])(
-    "requires approvals scope for %s",
-    (method) => {
-      expect(authorizeOperatorScopesForMethod(method, ["operator.write"])).toEqual({
-        allowed: false,
-        missingScope: "operator.approvals",
-      });
-      expect(authorizeOperatorScopesForMethod(method, ["operator.approvals"])).toEqual({
-        allowed: true,
-      });
-    },
-  );
+  it.each([
+    "plugin.approval.list",
+    "plugin.approval.request",
+    "plugin.approval.waitDecision",
+    "plugin.approval.resolve",
+  ])("requires approvals scope for %s", (method) => {
+    expect(authorizeOperatorScopesForMethod(method, ["operator.write"])).toEqual({
+      allowed: false,
+      missingScope: "operator.approvals",
+    });
+    expect(authorizeOperatorScopesForMethod(method, ["operator.approvals"])).toEqual({
+      allowed: true,
+    });
+  });
 
   it("requires admin for unknown methods", () => {
     expect(authorizeOperatorScopesForMethod("unknown.method", ["operator.read"])).toEqual({
@@ -145,12 +149,14 @@ describe("operator scope authorization", () => {
 describe("plugin approval method registration", () => {
   it("lists all plugin approval methods", () => {
     const methods = listGatewayMethods();
+    expect(methods).toContain("plugin.approval.list");
     expect(methods).toContain("plugin.approval.request");
     expect(methods).toContain("plugin.approval.waitDecision");
     expect(methods).toContain("plugin.approval.resolve");
   });
 
   it("classifies plugin approval methods", () => {
+    expect(isGatewayMethodClassified("plugin.approval.list")).toBe(true);
     expect(isGatewayMethodClassified("plugin.approval.request")).toBe(true);
     expect(isGatewayMethodClassified("plugin.approval.waitDecision")).toBe(true);
     expect(isGatewayMethodClassified("plugin.approval.resolve")).toBe(true);

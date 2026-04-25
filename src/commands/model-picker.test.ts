@@ -34,6 +34,21 @@ vi.mock("../agents/model-auth.js", () => ({
   hasUsableCustomProviderApiKey,
 }));
 
+const resolveOwningPluginIdsForProvider = vi.hoisted(() =>
+  vi.fn(({ provider }: { provider: string }) => {
+    if (provider === "byteplus" || provider === "byteplus-plan") {
+      return ["byteplus"];
+    }
+    if (provider === "volcengine" || provider === "volcengine-plan") {
+      return ["volcengine"];
+    }
+    return undefined;
+  }),
+);
+vi.mock("../plugins/providers.js", () => ({
+  resolveOwningPluginIdsForProvider,
+}));
+
 const providerModelPickerContributionRuntime = vi.hoisted(() => ({
   enabled: false,
   resolve: vi.fn(() => []),
@@ -85,15 +100,98 @@ function createSelectAllMultiselect() {
 beforeEach(() => {
   vi.clearAllMocks();
   providerModelPickerContributionRuntime.enabled = false;
+  resolveOwningPluginIdsForProvider.mockImplementation(({ provider }: { provider: string }) => {
+    if (provider === "byteplus" || provider === "byteplus-plan") {
+      return ["byteplus"];
+    }
+    if (provider === "volcengine" || provider === "volcengine-plan") {
+      return ["volcengine"];
+    }
+    return undefined;
+  });
 });
 
 describe("promptDefaultModel", () => {
+  it("adds auth-route hints for OpenAI API and Codex OAuth models", async () => {
+    loadModelCatalog.mockResolvedValue([
+      {
+        provider: "openai",
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+      },
+      {
+        provider: "openai-codex",
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+      },
+    ]);
+
+    const select = vi.fn(async (params) => params.initialValue as never);
+    const prompter = makePrompter({ select });
+
+    await promptDefaultModel({
+      config: { agents: { defaults: {} } } as OpenClawConfig,
+      prompter,
+      allowKeep: false,
+      includeManual: false,
+      ignoreAllowlist: true,
+    });
+
+    const options = select.mock.calls[0]?.[0]?.options ?? [];
+    expect(options).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          value: "openai/gpt-5.5",
+          hint: expect.stringContaining("API key route"),
+        }),
+        expect.objectContaining({
+          value: "openai-codex/gpt-5.5",
+          hint: expect.stringContaining("ChatGPT OAuth route"),
+        }),
+      ]),
+    );
+  });
+
+  it("hides legacy runtime providers from default model choices", async () => {
+    loadModelCatalog.mockResolvedValue([
+      { provider: "codex", id: "gpt-5.5", name: "GPT-5.5" },
+      { provider: "codex-cli", id: "gpt-5.5", name: "GPT-5.5" },
+      { provider: "claude-cli", id: "claude-sonnet-4-6", name: "Claude Sonnet" },
+      { provider: "google-gemini-cli", id: "gemini-3-pro-preview", name: "Gemini 3 Pro" },
+      { provider: "openai", id: "gpt-5.5", name: "GPT-5.5" },
+      { provider: "anthropic", id: "claude-sonnet-4-6", name: "Claude Sonnet" },
+      { provider: "google", id: "gemini-3-pro-preview", name: "Gemini 3 Pro" },
+      { provider: "openai-codex", id: "gpt-5.5", name: "GPT-5.5" },
+    ]);
+
+    const select = vi.fn(async (params) => params.initialValue as never);
+    const prompter = makePrompter({ select });
+
+    await promptDefaultModel({
+      config: { agents: { defaults: {} } } as OpenClawConfig,
+      prompter,
+      allowKeep: false,
+      includeManual: false,
+      ignoreAllowlist: true,
+    });
+
+    const optionValues = (select.mock.calls[0]?.[0]?.options ?? []).map(
+      (option: { value: string }) => option.value,
+    );
+    expect(optionValues).toEqual([
+      "openai/gpt-5.5",
+      "anthropic/claude-sonnet-4-6",
+      "google/gemini-3-pro-preview",
+      "openai-codex/gpt-5.5",
+    ]);
+  });
+
   it("treats byteplus plan models as preferred-provider matches", async () => {
     loadModelCatalog.mockResolvedValue([
       {
         provider: "openai",
-        id: "gpt-5.4",
-        name: "GPT-5.4",
+        id: "gpt-5.5",
+        name: "GPT-5.5",
       },
       {
         provider: "byteplus-plan",
@@ -107,7 +205,7 @@ describe("promptDefaultModel", () => {
     const config = {
       agents: {
         defaults: {
-          model: "openai/gpt-5.4",
+          model: "openai/gpt-5.5",
         },
       },
     } as OpenClawConfig;
@@ -127,6 +225,12 @@ describe("promptDefaultModel", () => {
     expect(optionValues[1]).toBe("byteplus-plan/ark-code-latest");
     expect(select.mock.calls[0]?.[0]?.initialValue).toBe("byteplus-plan/ark-code-latest");
     expect(result.model).toBe("byteplus-plan/ark-code-latest");
+    expect(resolveOwningPluginIdsForProvider).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: "byteplus" }),
+    );
+    expect(resolveOwningPluginIdsForProvider).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: "byteplus-plan" }),
+    );
   });
 
   it("supports configuring vLLM during setup", async () => {
@@ -206,8 +310,8 @@ describe("promptDefaultModel", () => {
     loadModelCatalog.mockResolvedValue([
       {
         provider: "openai",
-        id: "gpt-5.4",
-        name: "GPT-5.4",
+        id: "gpt-5.5",
+        name: "GPT-5.5",
       },
     ]);
     providerModelPickerContributionRuntime.enabled = true;
@@ -273,8 +377,8 @@ describe("promptModelAllowlist", () => {
       },
       {
         provider: "openai",
-        id: "gpt-5.4",
-        name: "GPT-5.2",
+        id: "gpt-5.5",
+        name: "GPT-5.5",
       },
     ]);
 
@@ -282,7 +386,7 @@ describe("promptModelAllowlist", () => {
     const prompter = makePrompter({ multiselect });
     const config = { agents: { defaults: {} } } as OpenClawConfig;
 
-    await promptModelAllowlist({
+    const result = await promptModelAllowlist({
       config,
       prompter,
       allowedKeys: ["anthropic/claude-opus-4-6"],
@@ -292,6 +396,7 @@ describe("promptModelAllowlist", () => {
     expect(options.map((opt: { value: string }) => opt.value)).toEqual([
       "anthropic/claude-opus-4-6",
     ]);
+    expect(result.scopeKeys).toEqual(["anthropic/claude-opus-4-6"]);
   });
 
   it("scopes the initial allowlist picker to the preferred provider", async () => {
@@ -303,8 +408,8 @@ describe("promptModelAllowlist", () => {
       },
       {
         provider: "openai",
-        id: "gpt-5.4",
-        name: "GPT-5.4",
+        id: "gpt-5.5",
+        name: "GPT-5.5",
       },
       {
         provider: "openai",
@@ -325,9 +430,48 @@ describe("promptModelAllowlist", () => {
 
     const options = multiselect.mock.calls[0]?.[0]?.options ?? [];
     expect(options.map((opt: { value: string }) => opt.value)).toEqual([
-      "openai/gpt-5.4",
+      "openai/gpt-5.5",
       "openai/gpt-5.4-mini",
     ]);
+  });
+});
+
+describe("runtime model picker visibility", () => {
+  it("hides legacy runtime refs from allowlist choices and configured supplements", async () => {
+    loadModelCatalog.mockResolvedValue([
+      { provider: "codex", id: "gpt-5.5", name: "GPT-5.5" },
+      { provider: "claude-cli", id: "claude-sonnet-4-6", name: "Claude Sonnet" },
+      { provider: "google-gemini-cli", id: "gemini-3-pro-preview", name: "Gemini 3 Pro" },
+      { provider: "openai", id: "gpt-5.5", name: "GPT-5.5" },
+      { provider: "anthropic", id: "claude-sonnet-4-6", name: "Claude Sonnet" },
+      { provider: "google", id: "gemini-3-pro-preview", name: "Gemini 3 Pro" },
+    ]);
+
+    const multiselect = createSelectAllMultiselect();
+    const prompter = makePrompter({ multiselect });
+    const config = {
+      agents: {
+        defaults: {
+          models: {
+            "codex/gpt-5.5": { alias: "legacy-codex" },
+            "claude-cli/claude-sonnet-4-6": { alias: "CLI Claude" },
+            "google-gemini-cli/gemini-3-pro-preview": { alias: "CLI Gemini" },
+            "openai/gpt-5.5": { alias: "gpt" },
+          },
+        },
+      },
+    } as OpenClawConfig;
+
+    await promptModelAllowlist({ config, prompter });
+
+    const call = multiselect.mock.calls[0]?.[0];
+    const optionValues = (call?.options ?? []).map((option: { value: string }) => option.value);
+    expect(optionValues).toEqual([
+      "openai/gpt-5.5",
+      "anthropic/claude-sonnet-4-6",
+      "google/gemini-3-pro-preview",
+    ]);
+    expect(call?.initialValues).toEqual(["openai/gpt-5.5"]);
   });
 });
 
@@ -369,16 +513,38 @@ describe("applyModelAllowlist", () => {
       agents: {
         defaults: {
           models: {
-            "openai/gpt-5.4": { alias: "gpt" },
+            "openai/gpt-5.5": { alias: "gpt" },
             "anthropic/claude-opus-4-6": { alias: "opus" },
           },
         },
       },
     } as OpenClawConfig;
 
-    const next = applyModelAllowlist(config, ["openai/gpt-5.4"]);
+    const next = applyModelAllowlist(config, ["openai/gpt-5.5"]);
     expect(next.agents?.defaults?.models).toEqual({
-      "openai/gpt-5.4": { alias: "gpt" },
+      "openai/gpt-5.5": { alias: "gpt" },
+    });
+  });
+
+  it("preserves entries outside scoped allowlist updates", () => {
+    const config = {
+      agents: {
+        defaults: {
+          models: {
+            "openai/gpt-5.5": { alias: "gpt" },
+            "anthropic/claude-opus-4-6": { alias: "opus" },
+            "anthropic/claude-sonnet-4-6": { alias: "sonnet" },
+          },
+        },
+      },
+    } as OpenClawConfig;
+
+    const next = applyModelAllowlist(config, ["anthropic/claude-sonnet-4-6"], {
+      scopeKeys: ["anthropic/claude-opus-4-6", "anthropic/claude-sonnet-4-6"],
+    });
+    expect(next.agents?.defaults?.models).toEqual({
+      "openai/gpt-5.5": { alias: "gpt" },
+      "anthropic/claude-sonnet-4-6": { alias: "sonnet" },
     });
   });
 
@@ -387,7 +553,7 @@ describe("applyModelAllowlist", () => {
       agents: {
         defaults: {
           models: {
-            "openai/gpt-5.4": { alias: "gpt" },
+            "openai/gpt-5.5": { alias: "gpt" },
           },
         },
       },
@@ -418,19 +584,36 @@ describe("applyModelFallbacksFromSelection", () => {
     });
   });
 
+  it("does not inject a phantom primary when none was configured", () => {
+    const config = {
+      agents: {
+        defaults: {},
+      },
+    } as OpenClawConfig;
+
+    const next = applyModelFallbacksFromSelection(config, [
+      "openai/gpt-5.5",
+      "anthropic/claude-sonnet-4-6",
+    ]);
+    expect(next.agents?.defaults?.model).toEqual({
+      fallbacks: ["anthropic/claude-sonnet-4-6"],
+    });
+    expect(next.agents?.defaults?.model).not.toHaveProperty("primary");
+  });
+
   it("keeps existing fallbacks when the primary is not selected", () => {
     const config = {
       agents: {
         defaults: {
-          model: { primary: "anthropic/claude-opus-4-6", fallbacks: ["openai/gpt-5.4"] },
+          model: { primary: "anthropic/claude-opus-4-6", fallbacks: ["openai/gpt-5.5"] },
         },
       },
     } as OpenClawConfig;
 
-    const next = applyModelFallbacksFromSelection(config, ["openai/gpt-5.4"]);
+    const next = applyModelFallbacksFromSelection(config, ["openai/gpt-5.5"]);
     expect(next.agents?.defaults?.model).toEqual({
       primary: "anthropic/claude-opus-4-6",
-      fallbacks: ["openai/gpt-5.4"],
+      fallbacks: ["openai/gpt-5.5"],
     });
   });
 });

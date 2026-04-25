@@ -12,6 +12,7 @@ import {
   logWebhookError,
   logWebhookProcessed,
   logWebhookReceived,
+  normalizeOptionalString,
   startDiagnosticHeartbeat,
   stopDiagnosticHeartbeat,
 } from "openclaw/plugin-sdk/text-runtime";
@@ -27,7 +28,8 @@ import { createTelegramBot } from "./bot.js";
 
 const TELEGRAM_WEBHOOK_MAX_BODY_BYTES = 1024 * 1024;
 const TELEGRAM_WEBHOOK_BODY_TIMEOUT_MS = 30_000;
-const TELEGRAM_WEBHOOK_CALLBACK_TIMEOUT_MS = 10_000;
+// Keep below Telegram/proxy read timeouts; grammY returns early while the handler continues.
+const TELEGRAM_WEBHOOK_CALLBACK_TIMEOUT_MS = 5_000;
 const isTelegramReactionWebhookDiagEnabled =
   process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_WEBHOOK === "1" ||
   process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_POLL === "1";
@@ -109,7 +111,7 @@ function hasValidTelegramWebhookSecret(
 }
 
 function parseIpLiteral(value: string | undefined): string | undefined {
-  const trimmed = value?.trim();
+  const trimmed = normalizeOptionalString(value);
   if (!trimmed) {
     return undefined;
   }
@@ -141,7 +143,7 @@ function isTrustedProxyAddress(
   }
   const blockList = new net.BlockList();
   for (const proxy of trustedProxies) {
-    const trimmed = proxy.trim();
+    const trimmed = normalizeOptionalString(proxy) ?? "";
     if (!trimmed) {
       continue;
     }
@@ -274,7 +276,7 @@ export async function startTelegramWebhook(opts: {
   const healthPath = opts.healthPath ?? "/healthz";
   const port = opts.port ?? 8787;
   const host = opts.host ?? "127.0.0.1";
-  const secret = typeof opts.secret === "string" ? opts.secret.trim() : "";
+  const secret = normalizeOptionalString(opts.secret) ?? "";
   if (!secret) {
     throw new Error(
       "Telegram webhook mode requires a non-empty secret token. " +

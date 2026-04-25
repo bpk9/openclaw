@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { OpenClawConfig } from "../../config/config.js";
+import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import {
   normalizePluginsConfigWithResolver,
@@ -77,6 +77,7 @@ export function resolvePluginSkillDirs(params: {
       origin: record.origin,
       config: normalizedPlugins,
       rootConfig: params.config,
+      enabledByDefault: record.enabledByDefault,
     });
     if (!activationState.activated) {
       continue;
