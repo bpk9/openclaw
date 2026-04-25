@@ -788,7 +788,7 @@ export async function runHeartbeatOnce(opts: {
   const isTelegramReactionWake = opts.reason === "telegram-reaction";
   const reactionWakeDiag =
     isTelegramReactionWake && isTelegramHeartbeatReactionDiagEnabled
-      ? (opts.deps?.runtime?.error ?? opts.deps?.runtime?.info)
+      ? (opts.deps?.runtime?.error ?? opts.deps?.runtime?.log)
       : undefined;
   const heartbeat = opts.heartbeat ?? resolveHeartbeatConfig(cfg, agentId);
   if (!areHeartbeatsEnabled()) {

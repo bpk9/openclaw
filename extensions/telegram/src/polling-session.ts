@@ -1,14 +1,18 @@
 import { type RunOptions, run } from "@grammyjs/runner";
+import type { ChannelAccountSnapshot } from "openclaw/plugin-sdk/channel-contract";
 import {
   computeBackoff,
   formatDurationPrecise,
   sleepWithAbort,
 } from "openclaw/plugin-sdk/runtime-env";
 import { formatErrorMessage } from "openclaw/plugin-sdk/ssrf-runtime";
+import { normalizeLowercaseStringOrEmpty } from "openclaw/plugin-sdk/text-runtime";
 import { withTelegramApiErrorLogging } from "./api-logging.js";
 import { createTelegramBot } from "./bot.js";
 import { type TelegramTransport } from "./fetch.js";
 import { isRecoverableTelegramNetworkError } from "./network-errors.js";
+import { TelegramPollingLivenessTracker } from "./polling-liveness.js";
+import { createTelegramPollingStatusPublisher } from "./polling-status.js";
 import { TelegramPollingTransportState } from "./polling-transport-state.js";
 
 const TELEGRAM_POLL_RESTART_POLICY = {
@@ -18,14 +22,15 @@ const TELEGRAM_POLL_RESTART_POLICY = {
   jitter: 0.25,
 };
 
-const POLL_STALL_THRESHOLD_MS = 90_000;
+const DEFAULT_POLL_STALL_THRESHOLD_MS = 120_000;
+const MIN_POLL_STALL_THRESHOLD_MS = 30_000;
+const MAX_POLL_STALL_THRESHOLD_MS = 600_000;
 const POLL_WATCHDOG_INTERVAL_MS = 30_000;
 const POLL_STOP_GRACE_MS = 15_000;
+const CONFIRM_PERSISTED_OFFSET_TIMEOUT_MS = 10_000;
 
-const isTelegramReactionPollDiagEnabled =
-  process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_POLL === "1";
-const isTelegramRunnerDispatchDiagEnabled =
-  process.env.OPENCLAW_TELEGRAM_REACTION_DIAG_DISPATCH === "1";
+type TelegramBot = ReturnType<typeof createTelegramBot>;
+type TelegramApiAbortSignal = Parameters<TelegramBot["api"]["getUpdates"]>[1];
 
 const waitForGracefulStop = async (stop: () => Promise<void>) => {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -44,7 +49,18 @@ const waitForGracefulStop = async (stop: () => Promise<void>) => {
   }
 };
 
-type TelegramBot = ReturnType<typeof createTelegramBot>;
+const telegramApiTimeoutSignal = (timeoutMs: number): TelegramApiAbortSignal =>
+  AbortSignal.timeout(timeoutMs) as unknown as TelegramApiAbortSignal;
+
+const resolvePollingStallThresholdMs = (value: number | undefined): number => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_POLL_STALL_THRESHOLD_MS;
+  }
+  return Math.min(
+    MAX_POLL_STALL_THRESHOLD_MS,
+    Math.max(MIN_POLL_STALL_THRESHOLD_MS, Math.floor(value)),
+  );
+};
 
 type TelegramPollingSessionOpts = {
   token: string;
@@ -61,6 +77,9 @@ type TelegramPollingSessionOpts = {
   telegramTransport?: TelegramTransport;
   /** Rebuild Telegram transport after stall/network recovery when marked dirty. */
   createTelegramTransport?: () => TelegramTransport;
+  /** Stall detection threshold in ms. Defaults to 120_000 (2 min). */
+  stallThresholdMs?: number;
+  setStatus?: (patch: Omit<ChannelAccountSnapshot, "accountId">) => void;
 };
 
 export class TelegramPollingSession {
@@ -70,6 +89,8 @@ export class TelegramPollingSession {
   #activeRunner: ReturnType<typeof run> | undefined;
   #activeFetchAbort: AbortController | undefined;
   #transportState: TelegramPollingTransportState;
+  #status: ReturnType<typeof createTelegramPollingStatusPublisher>;
+  #stallThresholdMs: number;
 
   constructor(private readonly opts: TelegramPollingSessionOpts) {
     this.#transportState = new TelegramPollingTransportState({
@@ -77,6 +98,8 @@ export class TelegramPollingSession {
       initialTransport: opts.telegramTransport,
       createTelegramTransport: opts.createTelegramTransport,
     });
+    this.#status = createTelegramPollingStatusPublisher(opts.setStatus);
+    this.#stallThresholdMs = resolvePollingStallThresholdMs(opts.stallThresholdMs);
   }
 
   get activeRunner() {
@@ -96,24 +119,33 @@ export class TelegramPollingSession {
   }
 
   async runUntilAbort(): Promise<void> {
-    while (!this.opts.abortSignal?.aborted) {
-      const bot = await this.#createPollingBot();
-      if (!bot) {
-        continue;
-      }
+    this.#status.notePollingStart();
+    try {
+      while (!this.opts.abortSignal?.aborted) {
+        const bot = await this.#createPollingBot();
+        if (!bot) {
+          continue;
+        }
 
-      const cleanupState = await this.#ensureWebhookCleanup(bot);
-      if (cleanupState === "retry") {
-        continue;
-      }
-      if (cleanupState === "exit") {
-        return;
-      }
+        const cleanupState = await this.#ensureWebhookCleanup(bot);
+        if (cleanupState === "retry") {
+          continue;
+        }
+        if (cleanupState === "exit") {
+          return;
+        }
 
-      const state = await this.#runPollingCycle(bot);
-      if (state === "exit") {
-        return;
+        const state = await this.#runPollingCycle(bot);
+        if (state === "exit") {
+          return;
+        }
       }
+    } finally {
+      // Release the transport's dispatchers on session shutdown. Without
+      // this, the undici keep-alive sockets survive beyond the session and
+      // leak to api.telegram.org; see openclaw#68128.
+      await this.#transportState.dispose();
+      this.#status.notePollingStop();
     }
   }
 
@@ -199,7 +231,10 @@ export class TelegramPollingSession {
       return;
     }
     try {
-      await bot.api.getUpdates({ offset: lastUpdateId + 1, limit: 1, timeout: 0 });
+      await bot.api.getUpdates(
+        { offset: lastUpdateId + 1, limit: 1, timeout: 0 },
+        telegramApiTimeoutSignal(CONFIRM_PERSISTED_OFFSET_TIMEOUT_MS),
+      );
     } catch {
       // Non-fatal: runner middleware still skips duplicates via shouldSkipUpdate.
     }
@@ -208,217 +243,33 @@ export class TelegramPollingSession {
   async #runPollingCycle(bot: TelegramBot): Promise<"continue" | "exit"> {
     await this.#confirmPersistedOffset(bot);
 
-    let lastGetUpdatesAt = Date.now();
-    let lastApiActivityAt = Date.now();
-    let nextInFlightApiCallId = 0;
-    let latestInFlightApiStartedAt: number | null = null;
-    const inFlightApiStartedAt = new Map<number, number>();
-    let lastGetUpdatesStartedAt: number | null = null;
-    let lastGetUpdatesFinishedAt: number | null = null;
-    let lastGetUpdatesDurationMs: number | null = null;
-    let lastGetUpdatesOutcome = "not-started";
-    let lastGetUpdatesError: string | null = null;
-    let lastGetUpdatesOffset: number | null = null;
-    let inFlightGetUpdates = 0;
-    let stopSequenceLogged = false;
-    let stallDiagLoggedAt = 0;
-
-    const summarizeUpdateBatch = (updates: unknown[]) => {
-      let reactionUpdates = 0;
-      let reactionCountUpdates = 0;
-      const updateTypeCounts = new Map<string, number>();
-      for (const update of updates) {
-        if (!update || typeof update !== "object") {
-          continue;
-        }
-        if ("message_reaction" in update) {
-          reactionUpdates += 1;
-        }
-        if ("message_reaction_count" in update) {
-          reactionCountUpdates += 1;
-        }
-        for (const [key, value] of Object.entries(update)) {
-          if (key === "update_id" || value === undefined) {
-            continue;
-          }
-          updateTypeCounts.set(key, (updateTypeCounts.get(key) ?? 0) + 1);
-        }
-      }
-      const updateTypes = [...updateTypeCounts.entries()]
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([key, count]) => `${key}:${count}`)
-        .join(",");
-      return {
-        reactionUpdates,
-        reactionCountUpdates,
-        updateTypes,
-      };
-    };
-
-    const originalGetUpdates = bot.api.getUpdates.bind(bot.api);
-    (bot.api as { getUpdates: (...args: unknown[]) => Promise<unknown[]> }).getUpdates =
-      async (...args: unknown[]) => {
-        const payload = args[0] as { offset?: number; timeout?: number } | undefined;
-        const offset = typeof payload?.offset === "number" ? payload.offset : null;
-        const timeout = typeof payload?.timeout === "number" ? payload.timeout : null;
-        try {
-          const result = await originalGetUpdates(...(args as [unknown?]));
-          const updates = Array.isArray(result) ? result : [];
-          if (isTelegramReactionPollDiagEnabled) {
-            const summary = summarizeUpdateBatch(updates);
-            this.opts.log(
-              `[telegram-runner-source] account=${this.opts.accountId} batch=${updates.length} offset=${offset ?? "n/a"} timeout=${timeout ?? "n/a"} reaction=${summary.reactionUpdates} reaction_count=${summary.reactionCountUpdates} update_types=${summary.updateTypes || "none"}`,
-            );
-          }
-          return result;
-        } catch (err) {
-          if (isTelegramReactionPollDiagEnabled) {
-            this.opts.log(
-              `[telegram-runner-source] account=${this.opts.accountId} error=1 offset=${offset ?? "n/a"} timeout=${timeout ?? "n/a"} err=${formatErrorMessage(err)}`,
-            );
-          }
-          throw err;
-        }
-      };
-
+    const liveness = new TelegramPollingLivenessTracker({
+      onPollSuccess: (finishedAt) => this.#status.notePollSuccess(finishedAt),
+    });
     bot.api.config.use(async (prev, method, payload, signal) => {
       if (method !== "getUpdates") {
-        const startedAt = Date.now();
-        const callId = nextInFlightApiCallId;
-        nextInFlightApiCallId += 1;
-        inFlightApiStartedAt.set(callId, startedAt);
-        latestInFlightApiStartedAt =
-          latestInFlightApiStartedAt == null
-            ? startedAt
-            : Math.max(latestInFlightApiStartedAt, startedAt);
+        const callId = liveness.noteApiCallStarted();
         try {
           const result = await prev(method, payload, signal);
-          lastApiActivityAt = Date.now();
+          liveness.noteApiCallSuccess();
           return result;
         } finally {
-          inFlightApiStartedAt.delete(callId);
-          if (latestInFlightApiStartedAt === startedAt) {
-            let newestStartedAt: number | null = null;
-            for (const activeStartedAt of inFlightApiStartedAt.values()) {
-              newestStartedAt =
-                newestStartedAt == null
-                  ? activeStartedAt
-                  : Math.max(newestStartedAt, activeStartedAt);
-            }
-            latestInFlightApiStartedAt = newestStartedAt;
-          }
+          liveness.noteApiCallFinished(callId);
         }
       }
 
-      const startedAt = Date.now();
-      lastGetUpdatesAt = startedAt;
-      lastGetUpdatesStartedAt = startedAt;
-      lastGetUpdatesOffset =
-        payload && typeof payload === "object" && "offset" in payload
-          ? ((payload as { offset?: number }).offset ?? null)
-          : null;
-      inFlightGetUpdates += 1;
-      lastGetUpdatesOutcome = "started";
-      lastGetUpdatesError = null;
-
+      liveness.noteGetUpdatesStarted(payload);
       try {
         const result = await prev(method, payload, signal);
-        if (Array.isArray(result) && result.length > 0) {
-          let reactionUpdates = 0;
-          let reactionCountUpdates = 0;
-          const updateTypeCounts = new Map<string, number>();
-          for (const update of result) {
-            if (!update || typeof update !== "object") {
-              continue;
-            }
-            if ("message_reaction" in update) {
-              reactionUpdates += 1;
-            }
-            if ("message_reaction_count" in update) {
-              reactionCountUpdates += 1;
-            }
-            for (const [key, value] of Object.entries(update)) {
-              if (key === "update_id" || value === undefined) {
-                continue;
-              }
-              updateTypeCounts.set(key, (updateTypeCounts.get(key) ?? 0) + 1);
-            }
-          }
-          if (isTelegramReactionPollDiagEnabled) {
-            const updateTypes = [...updateTypeCounts.entries()]
-              .sort(([a], [b]) => a.localeCompare(b))
-              .map(([key, count]) => `${key}:${count}`)
-              .join(",");
-            this.opts.log(
-              `[telegram-poll-ingress] account=${this.opts.accountId} batch=${result.length} reaction=${reactionUpdates} reaction_count=${reactionCountUpdates} update_types=${updateTypes || "none"}`,
-            );
-          }
-        }
-        const finishedAt = Date.now();
-        lastGetUpdatesFinishedAt = finishedAt;
-        lastGetUpdatesDurationMs = finishedAt - startedAt;
-        lastGetUpdatesOutcome = Array.isArray(result) ? `ok:${result.length}` : "ok";
+        liveness.noteGetUpdatesSuccess(result);
         return result;
       } catch (err) {
-        const finishedAt = Date.now();
-        lastGetUpdatesFinishedAt = finishedAt;
-        lastGetUpdatesDurationMs = finishedAt - startedAt;
-        lastGetUpdatesOutcome = "error";
-        lastGetUpdatesError = formatErrorMessage(err);
+        liveness.noteGetUpdatesError(err);
         throw err;
       } finally {
-        inFlightGetUpdates = Math.max(0, inFlightGetUpdates - 1);
+        liveness.noteGetUpdatesFinished();
       }
     });
-
-    const originalHandleUpdate = bot.handleUpdate.bind(bot);
-    bot.handleUpdate = (async (...args: Parameters<typeof originalHandleUpdate>) => {
-      const update = args[0];
-      let shouldLogDispatch = isTelegramRunnerDispatchDiagEnabled;
-      let updateId = "n/a";
-      let updateTypes = "none";
-      let hasReaction = false;
-      let hasReactionCount = false;
-
-      if (update && typeof update === "object") {
-        const typedUpdate = update as Record<string, unknown>;
-        hasReaction = Object.prototype.hasOwnProperty.call(typedUpdate, "message_reaction");
-        hasReactionCount = Object.prototype.hasOwnProperty.call(typedUpdate, "message_reaction_count");
-        updateId = typeof typedUpdate.update_id === "number" ? String(typedUpdate.update_id) : "n/a";
-        updateTypes =
-          Object.entries(typedUpdate)
-            .filter(([key, value]) => key !== "update_id" && value !== undefined)
-            .map(([key]) => key)
-            .sort((a, b) => a.localeCompare(b))
-            .join(",") || "none";
-      }
-
-      const startedAtMs = shouldLogDispatch ? Date.now() : 0;
-      if (shouldLogDispatch) {
-        this.opts.log(
-          `[telegram-runner-dispatch] account=${this.opts.accountId} stage=enter update_id=${updateId} reaction=${hasReaction ? 1 : 0} reaction_count=${hasReactionCount ? 1 : 0} update_types=${updateTypes}`,
-        );
-      }
-
-      try {
-        const result = await originalHandleUpdate(...args);
-        if (shouldLogDispatch) {
-          const durationMs = Date.now() - startedAtMs;
-          this.opts.log(
-            `[telegram-runner-dispatch] account=${this.opts.accountId} stage=return update_id=${updateId} reaction=${hasReaction ? 1 : 0} reaction_count=${hasReactionCount ? 1 : 0} update_types=${updateTypes} duration_ms=${durationMs}`,
-          );
-        }
-        return result;
-      } catch (err) {
-        if (shouldLogDispatch) {
-          const durationMs = Date.now() - startedAtMs;
-          this.opts.log(
-            `[telegram-runner-dispatch] account=${this.opts.accountId} stage=throw update_id=${updateId} reaction=${hasReaction ? 1 : 0} reaction_count=${hasReactionCount ? 1 : 0} update_types=${updateTypes} duration_ms=${durationMs} err=${formatErrorMessage(err)}`,
-          );
-        }
-        throw err;
-      }
-    }) as typeof bot.handleUpdate;
 
     const runner = run(bot, this.opts.runnerOptions);
     this.#activeRunner = runner;
@@ -464,41 +315,14 @@ export class TelegramPollingSession {
         return;
       }
 
-      const now = Date.now();
-      const activeElapsed =
-        inFlightGetUpdates > 0 && lastGetUpdatesStartedAt != null
-          ? now - lastGetUpdatesStartedAt
-          : 0;
-      const idleElapsed =
-        inFlightGetUpdates > 0 ? 0 : now - (lastGetUpdatesFinishedAt ?? lastGetUpdatesAt);
-      const elapsed = inFlightGetUpdates > 0 ? activeElapsed : idleElapsed;
-      const apiLivenessAt =
-        latestInFlightApiStartedAt == null
-          ? lastApiActivityAt
-          : Math.max(lastApiActivityAt, latestInFlightApiStartedAt);
-      const apiElapsed = now - apiLivenessAt;
-
-      // Treat recent non-getUpdates success and recent non-getUpdates start as
-      // the same liveness signal. Slow delivery should suppress the watchdog,
-      // but only for the same bounded window as recent successful API traffic.
-      if (
-        elapsed > POLL_STALL_THRESHOLD_MS &&
-        apiElapsed > POLL_STALL_THRESHOLD_MS &&
-        runner.isRunning()
-      ) {
-        if (stallDiagLoggedAt && now - stallDiagLoggedAt < POLL_STALL_THRESHOLD_MS / 2) {
-          return;
-        }
-        stallDiagLoggedAt = now;
+      const stall = liveness.detectStall({
+        thresholdMs: this.#stallThresholdMs,
+        runnerIsRunning: runner.isRunning(),
+      });
+      if (stall) {
         this.#transportState.markDirty();
         stalledRestart = true;
-        const elapsedLabel =
-          inFlightGetUpdates > 0
-            ? `active getUpdates stuck for ${formatDurationPrecise(elapsed)}`
-            : `no completed getUpdates for ${formatDurationPrecise(elapsed)}`;
-        this.opts.log(
-          `[telegram] Polling stall detected (${elapsedLabel}); forcing restart. [diag inFlight=${inFlightGetUpdates} outcome=${lastGetUpdatesOutcome} startedAt=${lastGetUpdatesStartedAt ?? "n/a"} finishedAt=${lastGetUpdatesFinishedAt ?? "n/a"} durationMs=${lastGetUpdatesDurationMs ?? "n/a"} offset=${lastGetUpdatesOffset ?? "n/a"}${lastGetUpdatesError ? ` error=${lastGetUpdatesError}` : ""}]`,
-        );
+        this.opts.log(`[telegram] ${stall.message}`);
         void stopRunner();
         void stopBot();
         if (!forceCycleTimer) {
@@ -528,7 +352,7 @@ export class TelegramPollingSession {
           : "runner stopped (maxRetryTime exceeded or graceful stop)";
       this.#forceRestarted = false;
       this.opts.log(
-        `[telegram][diag] polling cycle finished reason=${reason} inFlight=${inFlightGetUpdates} outcome=${lastGetUpdatesOutcome} startedAt=${lastGetUpdatesStartedAt ?? "n/a"} finishedAt=${lastGetUpdatesFinishedAt ?? "n/a"} durationMs=${lastGetUpdatesDurationMs ?? "n/a"} offset=${lastGetUpdatesOffset ?? "n/a"}${lastGetUpdatesError ? ` error=${lastGetUpdatesError}` : ""}`,
+        `[telegram][diag] polling cycle finished reason=${reason} ${liveness.formatDiagnosticFields("error")}`,
       );
       const shouldRestart = await this.#waitBeforeRestart(
         (delay) => `Telegram polling runner stopped (${reason}); restarting in ${delay}.`,
@@ -544,7 +368,12 @@ export class TelegramPollingSession {
         this.#webhookCleared = false;
       }
       const isRecoverable = isRecoverableTelegramNetworkError(err, { context: "polling" });
-      if (isRecoverable) {
+      // Mark transport dirty on 409 conflict as well as recoverable network
+      // errors. Without this, Telegram-side session termination returns 409
+      // and the retry reuses the same HTTP keep-alive TCP socket, which
+      // Telegram treats as the "old" session and keeps terminating — producing
+      // a tight 409 retry loop at low but non-zero rate. (#69787)
+      if (isRecoverable || isConflict) {
         this.#transportState.markDirty();
       }
       if (!isConflict && !isRecoverable) {
@@ -553,7 +382,7 @@ export class TelegramPollingSession {
       const reason = isConflict ? "getUpdates conflict" : "network error";
       const errMsg = formatErrorMessage(err);
       this.opts.log(
-        `[telegram][diag] polling cycle error reason=${reason} inFlight=${inFlightGetUpdates} outcome=${lastGetUpdatesOutcome} startedAt=${lastGetUpdatesStartedAt ?? "n/a"} finishedAt=${lastGetUpdatesFinishedAt ?? "n/a"} durationMs=${lastGetUpdatesDurationMs ?? "n/a"} offset=${lastGetUpdatesOffset ?? "n/a"} err=${errMsg}${lastGetUpdatesError ? ` lastGetUpdatesError=${lastGetUpdatesError}` : ""}`,
+        `[telegram][diag] polling cycle error reason=${reason} ${liveness.formatDiagnosticFields("lastGetUpdatesError")} err=${errMsg}`,
       );
       const shouldRestart = await this.#waitBeforeRestart(
         (delay) => `Telegram ${reason}: ${errMsg}; retrying in ${delay}.`,
@@ -593,7 +422,7 @@ const isGetUpdatesConflict = (err: unknown) => {
   }
   const haystack = [typed.method, typed.description, typed.message]
     .filter((value): value is string => typeof value === "string")
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes("getupdates");
+    .join(" ");
+  const normalizedHaystack = normalizeLowercaseStringOrEmpty(haystack);
+  return normalizedHaystack.includes("getupdates");
 };
