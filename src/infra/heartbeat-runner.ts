@@ -520,6 +520,44 @@ function normalizeHeartbeatReply(
   return { shouldSkip: false, text: finalText, hasMedia };
 }
 
+function summarizeTelegramReactionSystemEvent(eventText: string): string {
+  const addedMatch = eventText.match(
+    /^Telegram reaction added:\s*(.+?)\s+by\s+.+?\s+on msg\s+(\d+)/i,
+  );
+  if (addedMatch) {
+    const emoji = addedMatch[1]?.trim();
+    const messageId = addedMatch[2]?.trim();
+    if (emoji && messageId) {
+      return `I saw your reaction (${emoji}) on message ${messageId}.`;
+    }
+  }
+  const countMatch = eventText.match(/^Telegram reaction count changed on msg\s+(\d+):\s*(.+)$/i);
+  if (countMatch) {
+    const messageId = countMatch[1]?.trim();
+    const summary = countMatch[2]?.trim();
+    if (messageId && summary) {
+      return `I saw reaction activity on message ${messageId} (${summary}).`;
+    }
+  }
+  return "I saw your reaction update.";
+}
+
+function resolveTelegramReactionWakeFallbackText(params: {
+  events: ReturnType<typeof peekSystemEventEntries>;
+  responsePrefix?: string;
+}): string {
+  const reactionEvent = params.events.find((event) =>
+    event.contextKey?.startsWith("telegram:reaction:"),
+  );
+  const base = reactionEvent
+    ? summarizeTelegramReactionSystemEvent(reactionEvent.text)
+    : "I saw your reaction update.";
+  if (!params.responsePrefix || base.startsWith(params.responsePrefix)) {
+    return base;
+  }
+  return `${params.responsePrefix} ${base}`;
+}
+
 type HeartbeatReasonFlags = {
   isExecEventReason: boolean;
   isCronEventReason: boolean;
@@ -739,6 +777,12 @@ export async function runHeartbeatOnce(opts: {
   const agentId = normalizeAgentId(
     explicitAgentId || forcedSessionAgentId || resolveDefaultAgentId(cfg),
   );
+  // Reaction-trigger wakes (channels.telegram.reactionTrigger) want to reach
+  // the user even when other heartbeat gates would normally suppress them.
+  // We loosen specific gates below; see each call-site for the rationale.
+  const isTelegramReactionWake =
+    opts.reason === "telegram-reaction" || opts.reason?.startsWith("telegram-reaction:") === true;
+  const isTargetedWake = Boolean(explicitAgentId || opts.sessionKey?.trim());
   const heartbeat = opts.heartbeat ?? resolveHeartbeatConfig(cfg, agentId);
   if (!areHeartbeatsEnabled()) {
     return { status: "skipped", reason: "disabled" };
@@ -756,7 +800,11 @@ export async function runHeartbeatOnce(opts: {
   }
 
   const queueSize = (opts.deps?.getQueueSize ?? getQueueSize)(CommandLane.Main);
-  if (queueSize > 0) {
+  // Reaction-trigger wakes that target a specific session bypass the main-lane
+  // busy gate. The reaction is user-visible context that drops on the floor if
+  // we wait for the lane to drain — by the time it does, the wake has been
+  // coalesced away. Bounded to targeted wakes so unrelated work isn't preempted.
+  if (queueSize > 0 && !(isTelegramReactionWake && isTargetedWake)) {
     return { status: "skipped", reason: "requests-in-flight" };
   }
 
@@ -781,9 +829,11 @@ export async function runHeartbeatOnce(opts: {
   // Check the resolved session lane — if it is busy, skip to avoid interrupting
   // an active streaming turn.  The wake-layer retry (heartbeat-wake.ts) will
   // re-schedule this wake automatically.  See #14396 (closed without merge).
+  // Same exception as the main lane: targeted reaction-trigger wakes bypass
+  // this gate so the user-visible reaction context isn't lost to coalescing.
   const sessionLaneKey = resolveEmbeddedSessionLane(sessionKey);
   const sessionLaneSize = (opts.deps?.getQueueSize ?? getQueueSize)(sessionLaneKey);
-  if (sessionLaneSize > 0) {
+  if (sessionLaneSize > 0 && !(isTelegramReactionWake && isTargetedWake)) {
     emitHeartbeatEvent({
       status: "skipped",
       reason: "requests-in-flight",
@@ -800,7 +850,7 @@ export async function runHeartbeatOnce(opts: {
   // sending the full conversation history (~100K tokens) to the LLM.
   // Delivery routing still uses the main session entry (lastChannel, lastTo).
   const useIsolatedSession = heartbeat?.isolatedSession === true;
-  const delivery = resolveHeartbeatDeliveryTarget({
+  let delivery = resolveHeartbeatDeliveryTarget({
     cfg,
     entry,
     heartbeat,
@@ -810,6 +860,25 @@ export async function runHeartbeatOnce(opts: {
     // to stale channels/threads because that base-session event context remains queued.
     turnSource: useIsolatedSession ? undefined : preflight.turnSourceDeliveryContext,
   });
+  // Reaction-trigger wakes commonly fire on sessions that have no resolved
+  // delivery target yet (the wake itself is the first user-visible signal in
+  // that session). Fall back to "last" so the reply reaches whichever chat the
+  // user is actually in.
+  if (
+    isTelegramReactionWake &&
+    (delivery.channel === "none" || !delivery.to) &&
+    !useIsolatedSession
+  ) {
+    const fallbackDelivery = resolveHeartbeatDeliveryTarget({
+      cfg,
+      entry,
+      heartbeat: { ...(heartbeat ?? {}), target: "last" },
+      turnSource: preflight.turnSourceDeliveryContext,
+    });
+    if (fallbackDelivery.channel !== "none" && fallbackDelivery.to) {
+      delivery = fallbackDelivery;
+    }
+  }
   const heartbeatAccountId = heartbeat?.accountId?.trim();
   if (delivery.reason === "unknown-account") {
     log.warn("heartbeat: unknown accountId", {
@@ -838,7 +907,10 @@ export async function runHeartbeatOnce(opts: {
   }).responsePrefix;
 
   const canRelayToUser = Boolean(
-    delivery.channel !== "none" && delivery.to && visibility.showAlerts,
+    // Reaction-trigger wakes always relay to the user even when alerts are
+    // hidden — the user just reacted, so a reply is expected and explicitly
+    // opted into via channels.telegram.reactionTrigger.
+    delivery.channel !== "none" && delivery.to && (visibility.showAlerts || isTelegramReactionWake),
   );
   const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
   const { prompt, hasExecCompletion, hasCronEvents } = resolveHeartbeatRunPrompt({
@@ -1077,11 +1149,31 @@ export async function runHeartbeatOnce(opts: {
     const getReplyFromConfig =
       opts.deps?.getReplyFromConfig ?? (await loadHeartbeatRunnerRuntime()).getReplyFromConfig;
     const replyResult = await getReplyFromConfig(ctx, replyOpts, cfg);
-    const replyPayload = resolveHeartbeatReplyPayload(replyResult);
+    let replyPayload = resolveHeartbeatReplyPayload(replyResult);
     const includeReasoning = heartbeat?.includeReasoning === true;
     const reasoningPayloads = includeReasoning
       ? resolveHeartbeatReasoningPayloads(replyResult).filter((payload) => payload !== replyPayload)
       : [];
+
+    // When reactionTrigger fires but the model produces no reply, optionally
+    // synthesize an acknowledgment so the user sees something. Off by default
+    // (channels.telegram.reactionTriggerFallbackText) — opt in only.
+    if (
+      isTelegramReactionWake &&
+      canRelayToUser &&
+      cfg?.channels?.telegram?.reactionTriggerFallbackText === true &&
+      reasoningPayloads.length === 0 &&
+      (!replyPayload || !hasOutboundReplyContent(replyPayload))
+    ) {
+      const pendingReactionEntries = preflight.pendingEventEntries.filter((event) =>
+        event.contextKey?.startsWith("telegram:reaction:"),
+      );
+      const fallbackText = resolveTelegramReactionWakeFallbackText({
+        events: pendingReactionEntries,
+        responsePrefix,
+      });
+      replyPayload = { text: fallbackText };
+    }
 
     if (!replyPayload || !hasOutboundReplyContent(replyPayload)) {
       await restoreHeartbeatUpdatedAt({
@@ -1151,6 +1243,10 @@ export async function runHeartbeatOnce(opts: {
     const prevHeartbeatAt =
       typeof entry?.lastHeartbeatSentAt === "number" ? entry.lastHeartbeatSentAt : undefined;
     const isDuplicateMain =
+      // Reaction-trigger wakes are user-initiated and may legitimately repeat
+      // (e.g. user reacts the same way to two consecutive messages). Skip the
+      // 24h dedupe window so the second reaction still gets a reply.
+      !isTelegramReactionWake &&
       !shouldSkipMain &&
       !mediaUrls.length &&
       Boolean(prevHeartbeatText.trim()) &&

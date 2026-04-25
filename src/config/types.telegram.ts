@@ -187,6 +187,23 @@ export type TelegramAccountConfig = {
    * - "extensive": agent can react liberally when appropriate
    */
   reactionLevel?: "off" | "ack" | "minimal" | "extensive";
+  /**
+   * When true, an incoming user reaction wakes a full agent turn instead of
+   * only queuing a system context event for the next inbound message. Reaction
+   * wakes bypass the main- and session-lane busy gates and the alerts-disabled
+   * gate so the reaction always reaches the user; opt in deliberately. The
+   * reaction system event still flows through the normal context queue.
+   * Default: false.
+   */
+  reactionTrigger?: boolean;
+  /**
+   * When reactionTrigger is true and the model returns an empty reply, the
+   * gateway can synthesize a brief acknowledgment (e.g. "I saw your reaction
+   * (👎) on message 123") so the user gets some response. Off by default to
+   * avoid sending bot messages the user did not solicit. Has no effect when
+   * reactionTrigger is false.
+   */
+  reactionTriggerFallbackText?: boolean;
   /** Heartbeat visibility settings for this channel. */
   heartbeat?: ChannelHeartbeatVisibilityConfig;
   /** Channel health monitor overrides for this channel/account. */

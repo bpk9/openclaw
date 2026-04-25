@@ -75,6 +75,11 @@ function normalizeWakeReason(reason?: string): string {
   return normalizeHeartbeatWakeReason(reason);
 }
 
+function isTelegramReactionWakeReason(reason?: string): boolean {
+  const normalized = normalizeWakeReason(reason);
+  return normalized === "telegram-reaction" || normalized.startsWith("telegram-reaction:");
+}
+
 function normalizeWakeTarget(value?: string): string | undefined {
   const trimmed = normalizeOptionalString(value) ?? "";
   return trimmed || undefined;
@@ -122,8 +127,22 @@ function queuePendingWakeReason(params?: {
     pendingWakes.set(wakeTargetKey, merged);
     return;
   }
-  if (next.priority === previous.priority && next.requestedAt >= previous.requestedAt) {
-    pendingWakes.set(wakeTargetKey, merged);
+  if (next.priority === previous.priority) {
+    // Telegram-reaction wakes carry user-visible context that drops on the floor
+    // if a same-priority later wake displaces them. Keep the reaction reason
+    // when both compete; otherwise newest wins.
+    const previousIsReaction = isTelegramReactionWakeReason(previous.reason);
+    const nextIsReaction = isTelegramReactionWakeReason(next.reason);
+    if (previousIsReaction && !nextIsReaction) {
+      return;
+    }
+    if (!previousIsReaction && nextIsReaction) {
+      pendingWakes.set(wakeTargetKey, merged);
+      return;
+    }
+    if (next.requestedAt >= previous.requestedAt) {
+      pendingWakes.set(wakeTargetKey, merged);
+    }
   }
 }
 
