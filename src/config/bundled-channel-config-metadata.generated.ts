@@ -13426,6 +13426,12 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
           type: "string",
           enum: ["off", "ack", "minimal", "extensive"],
         },
+        reactionTrigger: {
+          type: "boolean",
+        },
+        reactionTriggerFallbackText: {
+          type: "boolean",
+        },
         heartbeat: {
           type: "object",
           properties: {
@@ -14466,6 +14472,12 @@ export const GENERATED_BUNDLED_CHANNEL_CONFIG_METADATA = [
               reactionLevel: {
                 type: "string",
                 enum: ["off", "ack", "minimal", "extensive"],
+              },
+              reactionTrigger: {
+                type: "boolean",
+              },
+              reactionTriggerFallbackText: {
+                type: "boolean",
               },
               heartbeat: {
                 type: "object",

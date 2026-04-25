@@ -36,6 +36,9 @@ export function resolveHeartbeatReasonKind(reason?: string): HeartbeatReasonKind
   if (trimmed === "wake") {
     return "wake";
   }
+  if (trimmed === "telegram-reaction" || trimmed.startsWith("telegram-reaction:")) {
+    return "wake";
+  }
   if (trimmed.startsWith("acp:spawn:")) {
     return "wake";
   }
@@ -55,5 +58,11 @@ export function isHeartbeatEventDrivenReason(reason?: string): boolean {
 
 export function isHeartbeatActionWakeReason(reason?: string): boolean {
   const kind = resolveHeartbeatReasonKind(reason);
-  return kind === "manual" || kind === "exec-event" || kind === "hook";
+  return (
+    kind === "manual" ||
+    kind === "exec-event" ||
+    kind === "hook" ||
+    trimReason(reason) === "telegram-reaction" ||
+    trimReason(reason).startsWith("telegram-reaction:")
+  );
 }

@@ -5,6 +5,7 @@ import {
   createInboundDebouncer,
   resolveInboundDebounceMs,
 } from "openclaw/plugin-sdk/channel-inbound-debounce";
+import { requestHeartbeatNow } from "openclaw/plugin-sdk/channel-runtime";
 import { resolveStoredModelOverride } from "openclaw/plugin-sdk/command-auth";
 import {
   resolveCommandAuthorization,
@@ -983,6 +984,18 @@ export const registerTelegramHandlers = ({
           contextKey: `telegram:reaction:add:${chatId}:${messageId}:${user?.id ?? "anon"}:${emoji}`,
         });
         logVerbose(`telegram: reaction event enqueued: ${text}`);
+      }
+
+      // When reactionTrigger is enabled, wake the agent so it can respond to
+      // the reaction immediately instead of waiting for the next inbound
+      // message to drain the system event queue. Coalesced ~500ms so a burst
+      // of reactions on the same message yields one turn.
+      if (telegramCfg.reactionTrigger === true) {
+        requestHeartbeatNow({
+          reason: "telegram-reaction",
+          sessionKey,
+          coalesceMs: 500,
+        });
       }
     } catch (err) {
       runtime.error?.(danger(`telegram reaction handler failed: ${String(err)}`));
